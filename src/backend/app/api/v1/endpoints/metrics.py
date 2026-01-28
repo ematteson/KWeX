@@ -178,45 +178,51 @@ def get_friction_breakdown(
             "dimensions": [],
         }
 
-    # Extract friction breakdown from stored data or calculate from survey
+    # Extract friction and safety breakdowns from stored data
+    # The MetricsCalculator stores friction_breakdown with:
+    #   dependency_wait, approval_latency, rework_from_unclear, tooling_pain, process_confusion
+    # And safety_breakdown with:
+    #   rework_events, quality_escapes, decision_reversals, psychological_safety
     friction_data = result.friction_breakdown or {}
+    safety_data = result.safety_breakdown or {}
 
     # Build dimension breakdown for heatmap
+    # Map stored keys to user-friendly dimension names for the 6 friction dimensions
     dimensions = [
         {
             "dimension": "clarity",
             "label": "Task Clarity",
-            "score": friction_data.get("clarity", 50),
+            "score": friction_data.get("rework_from_unclear", 50),  # Clarity issues manifest as rework
             "description": "How clear are requirements and expectations",
         },
         {
             "dimension": "tooling",
             "label": "Tooling",
-            "score": friction_data.get("tooling", 50),
+            "score": friction_data.get("tooling_pain", 50),
             "description": "Effectiveness of tools and systems",
         },
         {
             "dimension": "process",
             "label": "Process",
-            "score": friction_data.get("process", 50),
+            "score": friction_data.get("process_confusion", 50),
             "description": "Efficiency of workflows and approvals",
         },
         {
             "dimension": "rework",
             "label": "Rework",
-            "score": friction_data.get("rework", 50),
+            "score": 100 - safety_data.get("rework_events", 50),  # Invert: safety stores "less rework = higher"
             "description": "Frequency of redoing completed work",
         },
         {
             "dimension": "delay",
             "label": "Delays",
-            "score": friction_data.get("delay", 50),
+            "score": (friction_data.get("dependency_wait", 50) + friction_data.get("approval_latency", 50)) / 2,
             "description": "Wait times for dependencies and decisions",
         },
         {
             "dimension": "safety",
             "label": "Psych Safety",
-            "score": friction_data.get("safety", 50),
+            "score": 100 - safety_data.get("psychological_safety", 50),  # Invert: high psych safety = low friction
             "description": "Comfort speaking up and taking risks",
         },
     ]
