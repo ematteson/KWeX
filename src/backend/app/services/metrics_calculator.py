@@ -65,6 +65,12 @@ class SafetyBreakdown(MetricBreakdown):
 
 @dataclass
 class PortfolioBreakdown(MetricBreakdown):
+    # New value-based model
+    value_adding_pct: float  # Direct value creation
+    value_enabling_pct: float  # Necessary support work
+    waste_pct: float  # Non-value work (friction manifestation)
+    health_score: float  # 0-100 health indicator
+    # Legacy fields
     run_percentage: float
     change_percentage: float
     deviation_from_ideal: float
@@ -343,14 +349,21 @@ class MetricsCalculator:
         """
         Calculate Portfolio Balance score from survey responses.
 
-        Portfolio Balance measures the health of Run vs. Change work allocation:
-        - Run: Operational, maintenance, support work
-        - Change: New features, improvements, innovation
+        Portfolio Balance measures time allocation health using Lean principles:
+        - Value Adding (VA): Direct value creation work (building, creating, deciding)
+        - Value Enabling (VE): Necessary support work (planning, compliance, coordination)
+        - Waste (NVA): Non-value work to minimize (waiting, rework, unnecessary meetings)
+
+        Waste is derived from friction responses - it's friction manifested as time.
         """
         if not responses:
-            return 50.0, PortfolioBreakdown(50, 50, 50)
+            return 50.0, PortfolioBreakdown(
+                value_adding_pct=50, value_enabling_pct=35, waste_pct=15,
+                health_score=50, run_percentage=50, change_percentage=50,
+                deviation_from_ideal=25
+            )
 
-        # Get portfolio balance questions (percentage sliders)
+        # Get portfolio balance questions
         portfolio_questions = (
             self.db.query(Question)
             .filter(Question.survey_id == survey.id)
@@ -361,6 +374,11 @@ class MetricsCalculator:
             if MetricType.PORTFOLIO_BALANCE.value in (q.metric_mapping or [])
         ]
 
+        # Collect responses for each category
+        value_adding_scores = []
+        value_enabling_scores = []
+        waste_scores = []
+        # Legacy: also track run/change for backward compatibility
         run_percentages = []
         change_percentages = []
 
@@ -369,35 +387,95 @@ class MetricsCalculator:
                 answer = self._get_answer(response.id, question.id)
                 if answer and answer.numeric_value is not None:
                     text_lower = question.text.lower()
+
+                    # New value-based categorization
+                    if any(kw in text_lower for kw in ["value adding", "direct value", "creating", "building", "delivering"]):
+                        value_adding_scores.append(answer.numeric_value)
+                    elif any(kw in text_lower for kw in ["value enabling", "support", "planning", "coordination", "compliance"]):
+                        value_enabling_scores.append(answer.numeric_value)
+                    elif any(kw in text_lower for kw in ["waste", "waiting", "rework", "unnecessary", "blocked"]):
+                        waste_scores.append(answer.numeric_value)
+
+                    # Legacy categorization
                     if "operational" in text_lower or "maintenance" in text_lower or "run" in text_lower:
                         run_percentages.append(answer.numeric_value)
                     elif "new" in text_lower or "improvement" in text_lower or "initiative" in text_lower:
                         change_percentages.append(answer.numeric_value)
 
-        # Calculate averages
-        avg_run = self._safe_average(run_percentages) if run_percentages else 50.0
-        avg_change = self._safe_average(change_percentages) if change_percentages else 50.0
+        # Calculate value-based percentages
+        # If no explicit value-adding questions, estimate from change work questions
+        if value_adding_scores:
+            va_pct = self._safe_average(value_adding_scores)
+        elif change_percentages:
+            va_pct = self._safe_average(change_percentages)
+        else:
+            va_pct = 50.0
 
-        # Normalize to percentages (slider values are 0-100)
-        run_pct = avg_run / 100.0
-        change_pct = avg_change / 100.0
+        # If no explicit value-enabling questions, estimate from run work questions
+        if value_enabling_scores:
+            ve_pct = self._safe_average(value_enabling_scores)
+        elif run_percentages:
+            ve_pct = self._safe_average(run_percentages)
+        else:
+            ve_pct = 35.0
+
+        # Waste: use explicit questions or derive from friction (later we can integrate with friction score)
+        if waste_scores:
+            waste_pct = self._safe_average(waste_scores)
+        else:
+            # Estimate waste as remainder if we have VA and VE data
+            # Otherwise default to 15% (typical knowledge work waste)
+            if value_adding_scores or value_enabling_scores:
+                waste_pct = max(0, 100 - va_pct - ve_pct)
+            else:
+                waste_pct = 15.0
+
+        # Normalize to ensure total = 100%
+        total = va_pct + ve_pct + waste_pct
+        if total > 0:
+            va_pct = (va_pct / total) * 100
+            ve_pct = (ve_pct / total) * 100
+            waste_pct = (waste_pct / total) * 100
 
         # Get ideal ratios from occupation
+        ideal_va = (occupation.ideal_value_adding_pct if hasattr(occupation, 'ideal_value_adding_pct') and occupation.ideal_value_adding_pct else 0.50) * 100
+        ideal_ve = (occupation.ideal_value_enabling_pct if hasattr(occupation, 'ideal_value_enabling_pct') and occupation.ideal_value_enabling_pct else 0.35) * 100
+        ideal_waste = (occupation.ideal_waste_pct if hasattr(occupation, 'ideal_waste_pct') and occupation.ideal_waste_pct else 0.15) * 100
+
+        # Calculate health score based on:
+        # 1. VA should be >= ideal (more direct value work is good)
+        # 2. Waste should be <= ideal (less waste is good)
+        # 3. VE should be close to ideal (too little = unsustainable, too much = overhead)
+
+        va_health = min(100, (va_pct / ideal_va) * 100) if ideal_va > 0 else 100
+        waste_health = min(100, (ideal_waste / max(waste_pct, 1)) * 100)  # Invert: less waste = better
+        ve_deviation = abs(ve_pct - ideal_ve) / ideal_ve if ideal_ve > 0 else 0
+        ve_health = max(0, 100 - (ve_deviation * 100))
+
+        # Weighted health score
+        health_score = (va_health * 0.40) + (waste_health * 0.40) + (ve_health * 0.20)
+        health_score = min(100, max(0, health_score))
+
+        # Legacy calculations for backward compatibility
+        avg_run = self._safe_average(run_percentages) if run_percentages else ve_pct
+        avg_change = self._safe_average(change_percentages) if change_percentages else va_pct
+        run_pct_legacy = avg_run / 100.0 if avg_run <= 1 else avg_run / 100.0
+        change_pct_legacy = avg_change / 100.0 if avg_change <= 1 else avg_change / 100.0
+
         ideal_run = occupation.ideal_run_percentage if occupation else 0.35
         ideal_change = occupation.ideal_change_percentage if occupation else 0.65
-
-        # Calculate deviation from ideal
-        run_deviation = abs(run_pct - ideal_run)
-        change_deviation = abs(change_pct - ideal_change)
+        run_deviation = abs(run_pct_legacy - ideal_run)
+        change_deviation = abs(change_pct_legacy - ideal_change)
         total_deviation = (run_deviation + change_deviation) / 2
 
-        # Convert to 0-100 score (100 = perfect balance)
-        # Cap deviation at 0.5 (50% deviation = 0 score)
-        capped_deviation = min(total_deviation, 0.5)
-        portfolio_score = 100 * (1 - (capped_deviation * 2))
-
-        return portfolio_score, PortfolioBreakdown(
-            run_pct * 100, change_pct * 100, total_deviation * 100
+        return health_score, PortfolioBreakdown(
+            value_adding_pct=round(va_pct, 1),
+            value_enabling_pct=round(ve_pct, 1),
+            waste_pct=round(waste_pct, 1),
+            health_score=round(health_score, 1),
+            run_percentage=round(avg_run, 1),
+            change_percentage=round(avg_change, 1),
+            deviation_from_ideal=round(total_deviation * 100, 1)
         )
 
     def _get_answer(self, response_id: str, question_id: str) -> Optional[Answer]:
@@ -507,6 +585,12 @@ class MetricsCalculator:
             }
         elif isinstance(breakdown, PortfolioBreakdown):
             return {
+                # New value-based model
+                "value_adding_pct": breakdown.value_adding_pct,
+                "value_enabling_pct": breakdown.value_enabling_pct,
+                "waste_pct": breakdown.waste_pct,
+                "health_score": breakdown.health_score,
+                # Legacy fields
                 "run_percentage": breakdown.run_percentage,
                 "change_percentage": breakdown.change_percentage,
                 "deviation_from_ideal": breakdown.deviation_from_ideal,

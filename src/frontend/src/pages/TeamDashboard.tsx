@@ -116,46 +116,96 @@ export function TeamDashboard() {
           isLoading={frictionLoading}
         />
 
-        {/* Portfolio Breakdown */}
+        {/* Portfolio Breakdown - Value Adding / Value Enabling / Waste */}
         <section className="card">
-          <h2 className="card-header">Portfolio Distribution</h2>
+          <h2 className="card-header">Time Allocation Health</h2>
           {metrics?.portfolio_breakdown && meetsPrivacyThreshold ? (
             <div className="flex flex-col gap-4">
-              <div className="flex h-8 rounded-full overflow-hidden">
+              {/* Three-way stacked bar */}
+              <div className="flex h-10 rounded-lg overflow-hidden shadow-inner">
                 <div
-                  className="bg-pearson-blue transition-all"
-                  style={{ width: `${metrics.portfolio_breakdown.run_percentage || 0}%` }}
-                />
+                  className="bg-emerald-500 transition-all flex items-center justify-center"
+                  style={{ width: `${metrics.portfolio_breakdown.value_adding_pct || metrics.portfolio_breakdown.change_percentage || 0}%` }}
+                  title="Value Adding"
+                >
+                  {(metrics.portfolio_breakdown.value_adding_pct || metrics.portfolio_breakdown.change_percentage || 0) >= 15 && (
+                    <span className="text-white text-xs font-medium">
+                      {Math.round(metrics.portfolio_breakdown.value_adding_pct || metrics.portfolio_breakdown.change_percentage || 0)}%
+                    </span>
+                  )}
+                </div>
                 <div
-                  className="bg-pearson-green transition-all"
-                  style={{ width: `${metrics.portfolio_breakdown.change_percentage || 0}%` }}
-                />
+                  className="bg-blue-500 transition-all flex items-center justify-center"
+                  style={{ width: `${metrics.portfolio_breakdown.value_enabling_pct || metrics.portfolio_breakdown.run_percentage || 0}%` }}
+                  title="Value Enabling"
+                >
+                  {(metrics.portfolio_breakdown.value_enabling_pct || metrics.portfolio_breakdown.run_percentage || 0) >= 15 && (
+                    <span className="text-white text-xs font-medium">
+                      {Math.round(metrics.portfolio_breakdown.value_enabling_pct || metrics.portfolio_breakdown.run_percentage || 0)}%
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="bg-red-400 transition-all flex items-center justify-center"
+                  style={{ width: `${metrics.portfolio_breakdown.waste_pct || 0}%` }}
+                  title="Waste"
+                >
+                  {(metrics.portfolio_breakdown.waste_pct || 0) >= 10 && (
+                    <span className="text-white text-xs font-medium">
+                      {Math.round(metrics.portfolio_breakdown.waste_pct || 0)}%
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
+
+              {/* Legend */}
+              <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-pearson-blue"></div>
-                  <span className="text-pearson-gray-600">
-                    Run Work: {Math.round(metrics.portfolio_breakdown.run_percentage || 0)}%
-                  </span>
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <div>
+                    <span className="font-medium text-pearson-gray-700">Value Adding</span>
+                    <span className="text-pearson-gray-500 ml-1">
+                      {Math.round(metrics.portfolio_breakdown.value_adding_pct || metrics.portfolio_breakdown.change_percentage || 0)}%
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-pearson-green"></div>
-                  <span className="text-pearson-gray-600">
-                    Change Work: {Math.round(metrics.portfolio_breakdown.change_percentage || 0)}%
-                  </span>
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <div>
+                    <span className="font-medium text-pearson-gray-700">Value Enabling</span>
+                    <span className="text-pearson-gray-500 ml-1">
+                      {Math.round(metrics.portfolio_breakdown.value_enabling_pct || metrics.portfolio_breakdown.run_percentage || 0)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                  <div>
+                    <span className="font-medium text-pearson-gray-700">Waste</span>
+                    <span className="text-pearson-gray-500 ml-1">
+                      {Math.round(metrics.portfolio_breakdown.waste_pct || 0)}%
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="mt-2 pt-4 border-t border-pearson-gray-100">
+
+              {/* Descriptions */}
+              <div className="mt-2 pt-4 border-t border-pearson-gray-100 space-y-2">
                 <p className="text-xs text-pearson-gray-500">
-                  <strong>Run Work</strong>: Operational tasks maintaining current systems.<br/>
-                  <strong>Change Work</strong>: New value creation and improvements.
+                  <strong className="text-emerald-600">Value Adding</strong>: Direct value creation - building, creating, solving, deciding.
+                </p>
+                <p className="text-xs text-pearson-gray-500">
+                  <strong className="text-blue-600">Value Enabling</strong>: Necessary support - planning, coordination, compliance, learning.
+                </p>
+                <p className="text-xs text-pearson-gray-500">
+                  <strong className="text-red-500">Waste</strong>: Non-value work to minimize - waiting, rework, unnecessary meetings.
                 </p>
               </div>
             </div>
           ) : (
             <div className="text-center py-8 text-pearson-gray-500">
               <p>Portfolio data not available.</p>
-              <p className="text-sm mt-1">Complete a survey to see portfolio distribution.</p>
+              <p className="text-sm mt-1">Complete a survey to see time allocation breakdown.</p>
             </div>
           )}
         </section>

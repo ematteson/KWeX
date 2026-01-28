@@ -111,6 +111,14 @@ class Occupation(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     faethm_code: Mapped[Optional[str]] = mapped_column(String(50))
     description: Mapped[Optional[str]] = mapped_column(Text)
+    # Portfolio balance: Value Adding + Value Enabling + Waste should = 100%
+    # Value Adding: Work that directly creates customer/stakeholder value
+    ideal_value_adding_pct: Mapped[float] = mapped_column(Float, default=0.50)
+    # Value Enabling: Necessary support work (planning, compliance, coordination)
+    ideal_value_enabling_pct: Mapped[float] = mapped_column(Float, default=0.35)
+    # Waste: Non-value work to minimize (waiting, rework, unnecessary meetings)
+    ideal_waste_pct: Mapped[float] = mapped_column(Float, default=0.15)
+    # Legacy fields for backward compatibility
     ideal_run_percentage: Mapped[float] = mapped_column(Float, default=0.35)
     ideal_change_percentage: Mapped[float] = mapped_column(Float, default=0.65)
     throughput_indicators: Mapped[Optional[list]] = mapped_column(JSON)

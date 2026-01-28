@@ -61,14 +61,19 @@ def _load_occupations_from_csv() -> list[dict]:
                 if not faethm_code or not name:
                     continue
 
-                # Determine ideal run/change percentages based on job category prefix
-                # These are reasonable defaults that can be customized
+                # Determine ideal portfolio percentages based on job category prefix
                 ideal_run, ideal_change = _estimate_portfolio_balance(faethm_code, name)
+                ideal_va, ideal_ve, ideal_waste = _estimate_value_portfolio(faethm_code, name)
 
                 occupations.append({
                     "faethm_code": faethm_code,
                     "name": name,
                     "description": description,
+                    # New value-based portfolio model
+                    "ideal_value_adding_pct": ideal_va,
+                    "ideal_value_enabling_pct": ideal_ve,
+                    "ideal_waste_pct": ideal_waste,
+                    # Legacy fields
                     "ideal_run_percentage": ideal_run,
                     "ideal_change_percentage": ideal_change,
                     "throughput_indicators": _generate_throughput_indicators(faethm_code, name),
@@ -82,7 +87,7 @@ def _load_occupations_from_csv() -> list[dict]:
 
 
 def _estimate_portfolio_balance(code: str, name: str) -> tuple[float, float]:
-    """Estimate ideal run/change percentage based on job category."""
+    """Estimate ideal run/change percentage based on job category (legacy)."""
     # Extract category prefix from code (e.g., "ADM" from "ADM.ABP")
     prefix = code.split(".")[0] if "." in code else code[:3]
 
@@ -135,6 +140,67 @@ def _estimate_portfolio_balance(code: str, name: str) -> tuple[float, float]:
     return category_balance.get(prefix, (0.45, 0.55))
 
 
+def _estimate_value_portfolio(code: str, name: str) -> tuple[float, float, float]:
+    """
+    Estimate ideal Value Adding / Value Enabling / Waste percentages based on job category.
+
+    Returns: (value_adding_pct, value_enabling_pct, waste_pct)
+
+    Value Adding: Direct value creation - building, creating, solving, deciding
+    Value Enabling: Necessary support - planning, coordination, compliance, learning
+    Waste: Non-value work (target) - waiting, rework, unnecessary meetings
+    """
+    prefix = code.split(".")[0] if "." in code else code[:3]
+
+    # Define value portfolio by job category
+    # (value_adding, value_enabling, waste)
+    # Note: These should sum to 1.0
+    category_portfolio = {
+        # Administrative - more enabling work, process-heavy
+        "ADM": (0.35, 0.50, 0.15),
+        # Technology/IT - high value creation
+        "ICT": (0.55, 0.30, 0.15),
+        "TEC": (0.55, 0.30, 0.15),
+        # Management - balanced between creation and enabling
+        "MGT": (0.50, 0.35, 0.15),
+        "MAN": (0.50, 0.35, 0.15),
+        # Sales/Marketing - high value creation
+        "SAL": (0.50, 0.35, 0.15),
+        "MKT": (0.55, 0.30, 0.15),
+        # Finance/Accounting - balanced, compliance-heavy
+        "FIN": (0.45, 0.40, 0.15),
+        "ACC": (0.40, 0.45, 0.15),
+        # Creative/Design - very high value creation
+        "DES": (0.60, 0.25, 0.15),
+        "CRE": (0.60, 0.25, 0.15),
+        # Engineering - high value creation
+        "ENG": (0.55, 0.30, 0.15),
+        # Research/Science - very high value creation
+        "SCI": (0.60, 0.25, 0.15),
+        "RES": (0.60, 0.25, 0.15),
+        # Operations - balanced
+        "OPS": (0.45, 0.40, 0.15),
+        # HR/People - more enabling
+        "HRM": (0.40, 0.45, 0.15),
+        "PEO": (0.40, 0.45, 0.15),
+        # Customer Service - direct value through service
+        "CUS": (0.50, 0.35, 0.15),
+        "SVC": (0.50, 0.35, 0.15),
+        # Legal/Compliance - more enabling/protective
+        "LEG": (0.35, 0.50, 0.15),
+        # Healthcare - high direct value
+        "HEA": (0.55, 0.30, 0.15),
+        "MED": (0.55, 0.30, 0.15),
+        # Education - high direct value
+        "EDU": (0.55, 0.30, 0.15),
+        # Construction/Trades - direct value creation
+        "CON": (0.55, 0.30, 0.15),
+        "TRD": (0.55, 0.30, 0.15),
+    }
+
+    return category_portfolio.get(prefix, (0.50, 0.35, 0.15))
+
+
 def _generate_throughput_indicators(code: str, name: str) -> list[str]:
     """Generate relevant throughput indicators based on job type."""
     name_lower = name.lower()
@@ -169,6 +235,11 @@ def _get_fallback_occupations() -> list[dict]:
             "faethm_code": "MGT.PRD",
             "name": "Product Manager",
             "description": "Manage product development lifecycle and strategy",
+            # New value-based portfolio model
+            "ideal_value_adding_pct": 0.55,  # High direct value creation
+            "ideal_value_enabling_pct": 0.30,  # Coordination, planning
+            "ideal_waste_pct": 0.15,  # Target minimal waste
+            # Legacy fields
             "ideal_run_percentage": 0.30,
             "ideal_change_percentage": 0.70,
             "throughput_indicators": ["decisions closed", "roadmap items shipped", "features released"],
@@ -177,6 +248,9 @@ def _get_fallback_occupations() -> list[dict]:
             "faethm_code": "DES.UXD",
             "name": "UX Designer",
             "description": "Design user experiences and interfaces",
+            "ideal_value_adding_pct": 0.60,  # High creative/building work
+            "ideal_value_enabling_pct": 0.28,  # Research, iteration
+            "ideal_waste_pct": 0.12,
             "ideal_run_percentage": 0.25,
             "ideal_change_percentage": 0.75,
             "throughput_indicators": ["designs delivered", "iterations completed", "prototypes created"],
@@ -185,6 +259,9 @@ def _get_fallback_occupations() -> list[dict]:
             "faethm_code": "SAL.OPS",
             "name": "Sales Operations",
             "description": "Support sales processes and operations",
+            "ideal_value_adding_pct": 0.40,  # Deal support, proposals
+            "ideal_value_enabling_pct": 0.45,  # Process management, reporting
+            "ideal_waste_pct": 0.15,
             "ideal_run_percentage": 0.45,
             "ideal_change_percentage": 0.55,
             "throughput_indicators": ["proposals sent", "deals progressed", "contracts processed"],
@@ -193,6 +270,9 @@ def _get_fallback_occupations() -> list[dict]:
             "faethm_code": "FIN.ANA",
             "name": "Finance Analyst",
             "description": "Analyze financial data and provide insights",
+            "ideal_value_adding_pct": 0.45,  # Analysis, insights
+            "ideal_value_enabling_pct": 0.40,  # Reporting, compliance
+            "ideal_waste_pct": 0.15,
             "ideal_run_percentage": 0.55,
             "ideal_change_percentage": 0.45,
             "throughput_indicators": ["forecasts delivered", "reports completed", "analyses performed"],
@@ -201,6 +281,9 @@ def _get_fallback_occupations() -> list[dict]:
             "faethm_code": "CUS.EXP",
             "name": "Customer Experience Specialist",
             "description": "Ensure positive customer experiences",
+            "ideal_value_adding_pct": 0.50,  # Direct customer help
+            "ideal_value_enabling_pct": 0.35,  # Documentation, escalations
+            "ideal_waste_pct": 0.15,
             "ideal_run_percentage": 0.55,
             "ideal_change_percentage": 0.45,
             "throughput_indicators": ["tickets resolved", "CSAT maintained", "customers assisted"],

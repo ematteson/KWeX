@@ -30,6 +30,11 @@ class BaseSchema(BaseModel):
 class OccupationCreate(BaseModel):
     name: str
     faethm_code: Optional[str] = None
+    # New value-based portfolio model
+    ideal_value_adding_pct: float = 0.50  # Direct value creation
+    ideal_value_enabling_pct: float = 0.35  # Necessary support work
+    ideal_waste_pct: float = 0.15  # Target waste (should be minimized)
+    # Legacy fields for backward compatibility
     ideal_run_percentage: float = 0.35
     ideal_change_percentage: float = 0.65
     throughput_indicators: Optional[list[str]] = None
@@ -40,6 +45,11 @@ class OccupationResponse(BaseSchema):
     name: str
     faethm_code: Optional[str]
     description: Optional[str] = None
+    # New value-based portfolio model
+    ideal_value_adding_pct: float
+    ideal_value_enabling_pct: float
+    ideal_waste_pct: float
+    # Legacy fields
     ideal_run_percentage: float
     ideal_change_percentage: float
     throughput_indicators: Optional[list[str]]
@@ -284,6 +294,12 @@ class SafetyBreakdown(MetricBreakdown):
 
 
 class PortfolioBreakdown(MetricBreakdown):
+    # New value-based model
+    value_adding_pct: float  # Direct value creation work
+    value_enabling_pct: float  # Necessary support work
+    waste_pct: float  # Non-value work (friction manifestation)
+    health_score: float  # 0-100, higher = better balance
+    # Legacy fields for backward compatibility
     run_percentage: float
     change_percentage: float
     deviation_from_ideal: float
