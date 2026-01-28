@@ -193,7 +193,7 @@ curl -X POST http://localhost:8000/api/v1/surveys \
     "anonymous_mode": true
   }'
 
-# Generate questions
+# Generate questions (uses LLM if available, falls back to static)
 curl -X POST http://localhost:8000/api/v1/surveys/1/generate-questions
 
 # Activate survey
@@ -201,6 +201,9 @@ curl -X POST http://localhost:8000/api/v1/surveys/1/activate
 
 # Get anonymous response link
 curl http://localhost:8000/api/v1/surveys/1/link
+
+# Clone survey for next quarter (copies all questions)
+curl -X POST "http://localhost:8000/api/v1/surveys/1/clone?new_name=Q2%202024%20KWeX%20Survey"
 ```
 
 ### 4. Collect Responses
@@ -239,11 +242,50 @@ See [docs/API.md](docs/API.md) for complete API documentation.
 | `POST` | `/api/v1/occupations/sync` | Sync occupations from Faethm |
 | `GET` | `/api/v1/teams` | List all teams |
 | `POST` | `/api/v1/surveys` | Create a new survey |
+| `POST` | `/api/v1/surveys/{id}/generate-questions` | Generate survey questions |
 | `POST` | `/api/v1/surveys/{id}/activate` | Launch survey |
+| `POST` | `/api/v1/surveys/{id}/clone` | Clone survey for recurring use |
 | `GET` | `/api/v1/respond/{token}` | Get survey for anonymous response |
 | `POST` | `/api/v1/respond/{token}` | Submit survey response |
 | `GET` | `/api/v1/teams/{id}/metrics` | Get Core 4 metrics |
 | `GET` | `/api/v1/teams/{id}/opportunities` | Get RICE-scored opportunities |
+| `GET` | `/api/v1/status` | System status and version |
+| `POST` | `/api/v1/status/generate-sample-data` | Generate test data |
+
+## Development & Testing
+
+### Sample Data Generation
+
+For development and testing, you can generate sample survey responses:
+
+```bash
+# Generate 10 random responses for survey ID 1
+curl -X POST http://localhost:8000/api/v1/status/generate-sample-data \
+  -H "Content-Type: application/json" \
+  -d '{"survey_id": "1", "count": 10, "mode": "random"}'
+
+# Generate realistic persona-based responses (requires LLM)
+curl -X POST http://localhost:8000/api/v1/status/generate-sample-data \
+  -H "Content-Type: application/json" \
+  -d '{"survey_id": "1", "count": 8, "mode": "persona"}'
+```
+
+The persona mode uses 8 predefined employee personas (Eager Newcomer, Burned Out Veteran, Process Perfectionist, etc.) to generate realistic response patterns.
+
+### Survey Cloning
+
+Clone surveys for recurring quarterly assessments:
+
+```bash
+# Clone with auto-generated name
+curl -X POST http://localhost:8000/api/v1/surveys/1/clone
+
+# Clone with custom name
+curl -X POST "http://localhost:8000/api/v1/surveys/1/clone?new_name=Q2%202024%20Survey"
+
+# Clone to a different team
+curl -X POST "http://localhost:8000/api/v1/surveys/1/clone?new_team_id=2"
+```
 
 ## Privacy & Security
 

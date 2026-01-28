@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   useTeams,
   useOccupations,
@@ -8,9 +8,10 @@ import {
   useSearchAvailableOccupations,
   useSyncSingleOccupation,
 } from '../api/hooks'
-import type { CSVUploadResult, AvailableOccupation } from '../api/types'
+import type { CSVUploadResult, AvailableOccupation, Occupation } from '../api/types'
 
 export function TeamsPage() {
+  const navigate = useNavigate()
   const { data: teams, isLoading, error, refetch } = useTeams()
   const { data: occupations, refetch: refetchOccupations } = useOccupations()
   const syncOccupations = useSyncOccupations()
@@ -120,15 +121,37 @@ export function TeamsPage() {
       {/* Occupations Status */}
       {occupations && occupations.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-sm text-green-800">
-            <span className="font-medium">{occupations.length} occupations</span> synced.{' '}
-            <button
-              onClick={() => setShowOccupationModal(true)}
-              className="underline hover:text-green-900"
-            >
-              Browse all available occupations
-            </button>
-          </p>
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-sm text-green-800">
+              <span className="font-medium">{occupations.length} occupations</span> synced.{' '}
+              <button
+                onClick={() => setShowOccupationModal(true)}
+                className="underline hover:text-green-900"
+              >
+                Browse all available occupations
+              </button>
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {occupations.slice(0, 10).map((occ: Occupation) => (
+              <Link
+                key={occ.id}
+                to={`/occupations/${occ.id}`}
+                className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-green-200 rounded-full text-sm hover:bg-green-100 transition-colors"
+              >
+                <span className="font-mono text-xs text-green-700">{occ.faethm_code}</span>
+                <span className="text-gray-700">{occ.name}</span>
+              </Link>
+            ))}
+            {occupations.length > 10 && (
+              <button
+                onClick={() => setShowOccupationModal(true)}
+                className="inline-flex items-center px-3 py-1 bg-white border border-green-200 rounded-full text-sm text-green-600 hover:bg-green-100"
+              >
+                +{occupations.length - 10} more
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -237,7 +260,8 @@ export function TeamsPage() {
                     Showing {availableOccupations.returned} of {availableOccupations.total_available} total occupations
                   </p>
                   {availableOccupations.occupations.map((occ: AvailableOccupation) => {
-                    const isSynced = occupations?.some(o => o.faethm_code === occ.faethm_code)
+                    const syncedOccupation = occupations?.find((o: Occupation) => o.faethm_code === occ.faethm_code)
+                    const isSynced = !!syncedOccupation
                     const isSyncing = syncingCode === occ.faethm_code
 
                     return (
@@ -262,19 +286,32 @@ export function TeamsPage() {
                               {occ.description}
                             </p>
                           </div>
-                          <button
-                            onClick={() => handleSyncSingleOccupation(occ.faethm_code)}
-                            disabled={isSynced || isSyncing}
-                            className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap ${
-                              isSynced
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : isSyncing
-                                ? 'bg-blue-100 text-blue-600'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                            }`}
-                          >
-                            {isSynced ? 'Synced' : isSyncing ? 'Syncing...' : 'Sync'}
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            {isSynced ? (
+                              <button
+                                onClick={() => {
+                                  setShowOccupationModal(false)
+                                  setOccupationSearch('')
+                                  navigate(`/occupations/${syncedOccupation.id}`)
+                                }}
+                                className="px-3 py-1.5 text-sm rounded-lg whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
+                              >
+                                View Details
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleSyncSingleOccupation(occ.faethm_code)}
+                                disabled={isSyncing}
+                                className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap ${
+                                  isSyncing
+                                    ? 'bg-blue-100 text-blue-600'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                              >
+                                {isSyncing ? 'Syncing...' : 'Sync'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )

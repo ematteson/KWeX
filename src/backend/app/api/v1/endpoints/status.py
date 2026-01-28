@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import enum
 import os
+import random
 from datetime import datetime
 from typing import Optional
 
@@ -14,13 +16,23 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.database import get_db
 from app.models import (
-    Occupation, Task, Survey, Team, Question, Response,
+    Occupation, Task, Survey, Team, Question, Response, MetricResult,
     EnrichedTask, LLMQuestionTemplate, LLMGenerationLog,
+    GlobalTask, OccupationTask,
 )
 from app.services.faethm_client import FaethmClient, _load_occupations_from_csv, _get_csv_path
+from app.version import VERSION, VERSION_NAME, BUILD_DATE
 
 router = APIRouter(prefix="/status", tags=["status"])
 settings = get_settings()
+
+
+class VersionInfo(BaseModel):
+    """Application version information."""
+    backend: str
+    backend_name: str
+    backend_build_date: str
+    frontend: Optional[str] = None  # Set by frontend if available
 
 
 class FaethmStatus(BaseModel):
@@ -75,6 +87,9 @@ class DatabaseStatus(BaseModel):
     questions_count: int
     responses_count: int
     occupations_with_tasks: int
+    # Global task library stats
+    global_tasks_count: int
+    occupation_task_assignments: int
     # LLM-related stats
     enriched_tasks_count: int
     llm_templates_count: int
@@ -88,6 +103,7 @@ class OccupationSummary(BaseModel):
     name: str
     faethm_code: Optional[str]
     task_count: int
+    curated_tasks_count: int  # From OccupationTask assignments
     team_count: int
     survey_count: int
     enriched_tasks_count: int
@@ -95,6 +111,7 @@ class OccupationSummary(BaseModel):
 
 class SystemStatus(BaseModel):
     """Complete system status."""
+    version: VersionInfo
     timestamp: str
     environment: str
     faethm: FaethmStatus
@@ -255,6 +272,10 @@ def get_system_status(db: Session = Depends(get_db)):
     # Count occupations that have tasks
     occupations_with_tasks = db.query(func.count(func.distinct(Task.occupation_id))).scalar() or 0
 
+    # Global task library stats
+    global_tasks_count = db.query(func.count(GlobalTask.id)).scalar() or 0
+    occupation_task_assignments = db.query(func.count(OccupationTask.id)).scalar() or 0
+
     # LLM-related question counts
     from app.models.models import GenerationMethod
     llm_generated = db.query(func.count(Question.id)).filter(
@@ -273,6 +294,8 @@ def get_system_status(db: Session = Depends(get_db)):
         questions_count=questions_count,
         responses_count=responses_count,
         occupations_with_tasks=occupations_with_tasks,
+        global_tasks_count=global_tasks_count,
+        occupation_task_assignments=occupation_task_assignments,
         enriched_tasks_count=enriched_tasks_count,
         llm_templates_count=llm_templates,
         llm_generated_questions=llm_generated,
@@ -285,6 +308,9 @@ def get_system_status(db: Session = Depends(get_db)):
 
     for occ in occupations:
         task_count = db.query(func.count(Task.id)).filter(Task.occupation_id == occ.id).scalar() or 0
+        curated_tasks = db.query(func.count(OccupationTask.id)).filter(
+            OccupationTask.occupation_id == occ.id
+        ).scalar() or 0
         team_count = db.query(func.count(Team.id)).filter(Team.occupation_id == occ.id).scalar() or 0
         survey_count = db.query(func.count(Survey.id)).filter(Survey.occupation_id == occ.id).scalar() or 0
         enriched_count = db.query(func.count(EnrichedTask.id)).filter(
@@ -296,6 +322,7 @@ def get_system_status(db: Session = Depends(get_db)):
             name=occ.name,
             faethm_code=occ.faethm_code,
             task_count=task_count,
+            curated_tasks_count=curated_tasks,
             team_count=team_count,
             survey_count=survey_count,
             enriched_tasks_count=enriched_count,
@@ -305,6 +332,11 @@ def get_system_status(db: Session = Depends(get_db)):
     synced_occupations.sort(key=lambda x: x.team_count, reverse=True)
 
     return SystemStatus(
+        version=VersionInfo(
+            backend=VERSION,
+            backend_name=VERSION_NAME,
+            backend_build_date=BUILD_DATE,
+        ),
         timestamp=datetime.utcnow().isoformat(),
         environment="development" if settings.debug else "production",
         faethm=faethm_status,
@@ -345,6 +377,59 @@ def test_faethm_connection(db: Session = Depends(get_db)):
     except Exception as e:
         result["error"] = str(e)
         result["test_result"] = {"success": False}
+
+    return result
+
+
+@router.get("/faethm/tasks/{faethm_code}")
+def test_faethm_tasks_api(faethm_code: str):
+    """
+    Test the Faethm tasks API endpoint directly.
+
+    Returns raw API response for debugging.
+    """
+    import httpx
+
+    client = FaethmClient()
+
+    if client.use_mock:
+        return {
+            "mode": "mock",
+            "message": "API is in mock mode, cannot test live endpoint",
+        }
+
+    result = {
+        "mode": "live",
+        "faethm_code": faethm_code,
+        "endpoint": f"/di/v1/occupations/{faethm_code}/tasks/skills",
+        "api_url": client.api_url,
+        "raw_response": None,
+        "response_type": None,
+        "error": None,
+    }
+
+    try:
+        headers = {"Authorization": f"Bearer {client.api_key}"}
+        url = f"{client.api_url}/di/v1/occupations/{faethm_code}/tasks/skills"
+        response = httpx.get(url, headers=headers)
+        response.raise_for_status()
+
+        data = response.json()
+        result["raw_response"] = data
+        result["response_type"] = str(type(data))
+
+        if isinstance(data, list):
+            result["list_length"] = len(data)
+            if len(data) > 0:
+                result["first_item"] = data[0]
+                result["first_item_type"] = str(type(data[0]))
+        elif isinstance(data, dict):
+            result["dict_keys"] = list(data.keys())
+
+    except httpx.HTTPStatusError as e:
+        result["error"] = f"HTTP {e.response.status_code}: {e.response.text[:500]}"
+    except Exception as e:
+        result["error"] = str(e)
 
     return result
 
@@ -577,3 +662,656 @@ def get_survey_question_mapping(survey_id: str, db: Session = Depends(get_db)):
         questions_with_tasks=questions_with_tasks,
         questions=question_mappings,
     )
+
+
+# ============================================================================
+# Reset Endpoints (Development/Admin)
+# ============================================================================
+
+
+class ResetResult(BaseModel):
+    """Result of a reset operation."""
+    success: bool
+    message: str
+    deleted: dict
+
+
+@router.post("/reset/all", response_model=ResetResult)
+def reset_all_data(
+    confirm: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    Reset ALL data in the database. Use with caution!
+
+    Requires confirm=true query parameter to execute.
+    Deletes: surveys, responses, questions, teams, occupations, tasks, etc.
+    """
+    if not confirm:
+        return ResetResult(
+            success=False,
+            message="Add ?confirm=true to confirm full database reset",
+            deleted={},
+        )
+
+    from app.models import (
+        Answer, Response, Question, Survey, MetricResult, Opportunity,
+        Team, Task, FrictionSignal, EnrichedTask, LLMQuestionTemplate,
+        LLMGenerationLog,
+    )
+
+    deleted = {}
+
+    # Delete in order of dependencies
+    deleted["answers"] = db.query(Answer).delete()
+    deleted["responses"] = db.query(Response).delete()
+    deleted["questions"] = db.query(Question).delete()
+    deleted["metric_results"] = db.query(MetricResult).delete()
+    deleted["opportunities"] = db.query(Opportunity).delete()
+    deleted["surveys"] = db.query(Survey).delete()
+    deleted["teams"] = db.query(Team).delete()
+    deleted["friction_signals"] = db.query(FrictionSignal).delete()
+    deleted["tasks"] = db.query(Task).delete()
+    deleted["enriched_tasks"] = db.query(EnrichedTask).delete()
+    deleted["occupation_tasks"] = db.query(OccupationTask).delete()
+    deleted["global_tasks"] = db.query(GlobalTask).delete()
+    deleted["occupations"] = db.query(Occupation).delete()
+    deleted["llm_templates"] = db.query(LLMQuestionTemplate).delete()
+    deleted["llm_logs"] = db.query(LLMGenerationLog).delete()
+
+    db.commit()
+
+    return ResetResult(
+        success=True,
+        message="All data has been reset",
+        deleted=deleted,
+    )
+
+
+@router.post("/reset/occupation/{occupation_id}", response_model=ResetResult)
+def reset_occupation_data(
+    occupation_id: str,
+    confirm: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    Reset all data for a specific occupation.
+
+    Deletes: task assignments, surveys, teams linked to this occupation.
+    Keeps: the occupation itself and global tasks (they may be used by other occupations).
+    """
+    occupation = db.query(Occupation).filter(Occupation.id == occupation_id).first()
+    if not occupation:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Occupation not found")
+
+    if not confirm:
+        return ResetResult(
+            success=False,
+            message=f"Add ?confirm=true to confirm reset for occupation '{occupation.name}'",
+            deleted={},
+        )
+
+    from app.models import (
+        Answer, Response, Question, Survey, MetricResult, Opportunity,
+        Team, Task, FrictionSignal, EnrichedTask,
+    )
+
+    deleted = {}
+
+    # Get surveys for this occupation
+    survey_ids = [s.id for s in db.query(Survey).filter(Survey.occupation_id == occupation_id).all()]
+
+    # Delete survey-related data
+    if survey_ids:
+        deleted["answers"] = db.query(Answer).filter(
+            Answer.response_id.in_(
+                db.query(Response.id).filter(Response.survey_id.in_(survey_ids))
+            )
+        ).delete(synchronize_session=False)
+        deleted["responses"] = db.query(Response).filter(Response.survey_id.in_(survey_ids)).delete(synchronize_session=False)
+        deleted["questions"] = db.query(Question).filter(Question.survey_id.in_(survey_ids)).delete(synchronize_session=False)
+        deleted["metric_results"] = db.query(MetricResult).filter(MetricResult.survey_id.in_(survey_ids)).delete(synchronize_session=False)
+        deleted["opportunities"] = db.query(Opportunity).filter(Opportunity.survey_id.in_(survey_ids)).delete(synchronize_session=False)
+        deleted["surveys"] = db.query(Survey).filter(Survey.id.in_(survey_ids)).delete(synchronize_session=False)
+
+    # Delete teams for this occupation
+    deleted["teams"] = db.query(Team).filter(Team.occupation_id == occupation_id).delete()
+
+    # Delete task-related data
+    deleted["occupation_tasks"] = db.query(OccupationTask).filter(
+        OccupationTask.occupation_id == occupation_id
+    ).delete()
+    deleted["enriched_tasks"] = db.query(EnrichedTask).filter(
+        EnrichedTask.occupation_id == occupation_id
+    ).delete()
+
+    # Delete old Task model data
+    task_ids = [t.id for t in db.query(Task).filter(Task.occupation_id == occupation_id).all()]
+    if task_ids:
+        deleted["friction_signals"] = db.query(FrictionSignal).filter(
+            FrictionSignal.task_id.in_(task_ids)
+        ).delete(synchronize_session=False)
+    deleted["tasks"] = db.query(Task).filter(Task.occupation_id == occupation_id).delete()
+
+    db.commit()
+
+    return ResetResult(
+        success=True,
+        message=f"Data for occupation '{occupation.name}' has been reset",
+        deleted=deleted,
+    )
+
+
+@router.post("/reset/tasks", response_model=ResetResult)
+def reset_task_assignments(
+    confirm: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    Reset all task assignments and global tasks.
+
+    Keeps: occupations, teams, surveys.
+    Deletes: occupation_tasks, global_tasks, enriched_tasks.
+    """
+    if not confirm:
+        return ResetResult(
+            success=False,
+            message="Add ?confirm=true to confirm task reset",
+            deleted={},
+        )
+
+    from app.models import Task, FrictionSignal, EnrichedTask
+
+    deleted = {}
+
+    # Delete task assignments
+    deleted["occupation_tasks"] = db.query(OccupationTask).delete()
+    deleted["global_tasks"] = db.query(GlobalTask).delete()
+    deleted["enriched_tasks"] = db.query(EnrichedTask).delete()
+
+    # Also delete old Task model data
+    deleted["friction_signals"] = db.query(FrictionSignal).delete()
+    deleted["tasks"] = db.query(Task).delete()
+
+    db.commit()
+
+    return ResetResult(
+        success=True,
+        message="All task data has been reset",
+        deleted=deleted,
+    )
+
+
+@router.delete("/reset/occupation/{occupation_id}", response_model=ResetResult)
+def delete_occupation(
+    occupation_id: str,
+    confirm: bool = False,
+    db: Session = Depends(get_db),
+):
+    """
+    Completely delete an occupation and all its related data.
+    """
+    occupation = db.query(Occupation).filter(Occupation.id == occupation_id).first()
+    if not occupation:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Occupation not found")
+
+    if not confirm:
+        return ResetResult(
+            success=False,
+            message=f"Add ?confirm=true to confirm deletion of occupation '{occupation.name}'",
+            deleted={},
+        )
+
+    # First reset all related data
+    reset_result = reset_occupation_data(occupation_id, confirm=True, db=db)
+
+    # Then delete the occupation itself
+    db.query(Occupation).filter(Occupation.id == occupation_id).delete()
+    db.commit()
+
+    deleted = reset_result.deleted
+    deleted["occupation"] = 1
+
+    return ResetResult(
+        success=True,
+        message=f"Occupation '{occupation.name}' and all related data deleted",
+        deleted=deleted,
+    )
+
+
+# ============================================================================
+# Sample Data Generation (Development/Testing)
+# ============================================================================
+
+class GenerationMode(str, enum.Enum):
+    """Mode for generating sample data."""
+    RANDOM = "random"
+    PERSONA = "persona"
+
+
+class SampleDataRequest(BaseModel):
+    """Request to generate sample survey responses."""
+    survey_id: str
+    count: int = 5  # Number of responses to generate
+    mode: GenerationMode = GenerationMode.RANDOM
+
+
+class SampleDataResult(BaseModel):
+    """Result of sample data generation."""
+    success: bool
+    message: str
+    survey_id: str
+    survey_name: str
+    responses_created: int
+    mode: str
+    personas_used: Optional[list[str]] = None
+
+
+# Persona definitions for LLM-based generation
+PERSONAS = [
+    {
+        "name": "Frustrated Veteran",
+        "description": "A senior employee who has been with the company for 10+ years. They feel overwhelmed by constant process changes and new tools. They believe things were better in the old days and are skeptical of new initiatives.",
+        "bias": "negative",
+        "traits": ["experienced", "resistant to change", "values stability", "feels unheard"],
+    },
+    {
+        "name": "Enthusiastic New Hire",
+        "description": "A new employee who joined 3 months ago. They're excited about the work but still learning the ropes. They find some processes confusing but are optimistic about improvements.",
+        "bias": "positive",
+        "traits": ["eager", "learning", "optimistic", "asks questions"],
+    },
+    {
+        "name": "Burned Out Middle Manager",
+        "description": "A team lead who is caught between leadership demands and team needs. They're exhausted from constant meetings and firefighting. They see problems clearly but feel powerless to fix them.",
+        "bias": "mixed_negative",
+        "traits": ["stressed", "overworked", "insightful", "cynical"],
+    },
+    {
+        "name": "High Performer",
+        "description": "A top performer who has figured out how to work around most obstacles. They're generally satisfied but frustrated by bottlenecks that slow them down.",
+        "bias": "positive",
+        "traits": ["efficient", "results-driven", "impatient with inefficiency", "confident"],
+    },
+    {
+        "name": "Quiet Observer",
+        "description": "A solid contributor who keeps their head down and does good work. They notice issues but rarely speak up. They're moderately satisfied but see room for improvement.",
+        "bias": "neutral",
+        "traits": ["observant", "reserved", "practical", "risk-averse"],
+    },
+    {
+        "name": "Change Champion",
+        "description": "An employee who actively drives improvements and embraces new tools and processes. They're frustrated when others resist change and when good ideas get stuck in bureaucracy.",
+        "bias": "mixed_positive",
+        "traits": ["innovative", "proactive", "impatient", "collaborative"],
+    },
+    {
+        "name": "Disengaged Worker",
+        "description": "An employee who has mentally checked out. They do the minimum required and don't feel their input matters. They've stopped caring about improvements.",
+        "bias": "negative",
+        "traits": ["apathetic", "minimal effort", "disconnected", "going through motions"],
+    },
+    {
+        "name": "Remote Worker Struggling",
+        "description": "A remote employee who feels disconnected from the team. They struggle with communication delays and unclear expectations. Tools don't always work well for them.",
+        "bias": "mixed_negative",
+        "traits": ["isolated", "communication challenges", "flexible", "tech-dependent"],
+    },
+]
+
+
+def _generate_random_answer(question_type: str, options: Optional[dict] = None) -> tuple[str, float]:
+    """Generate a random answer based on question type.
+
+    Returns (string_value, numeric_value).
+    """
+    if question_type == "likert_5":
+        # Slightly bias toward middle values for more realistic distribution
+        weights = [0.1, 0.2, 0.3, 0.25, 0.15]  # Slight negative skew (realistic)
+        value = random.choices([1, 2, 3, 4, 5], weights=weights)[0]
+        return str(value), float(value)
+
+    elif question_type == "likert_7":
+        weights = [0.05, 0.1, 0.15, 0.25, 0.2, 0.15, 0.1]
+        value = random.choices([1, 2, 3, 4, 5, 6, 7], weights=weights)[0]
+        return str(value), float(value)
+
+    elif question_type == "percentage_slider":
+        # Generate percentage with some clustering around common values
+        common_values = [0, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100]
+        if random.random() < 0.6:  # 60% chance to use common value
+            value = random.choice(common_values)
+        else:
+            value = random.randint(0, 100)
+        return str(value), float(value)
+
+    elif question_type == "multiple_choice":
+        if options and isinstance(options, list):
+            choice = random.choice(options)
+            return str(choice), 0.0
+        return "1", 1.0
+
+    elif question_type == "free_text":
+        responses = [
+            "No specific feedback.",
+            "Things are generally okay.",
+            "Could be better with more resources.",
+            "I appreciate the team's efforts.",
+            "Process improvements would help.",
+        ]
+        return random.choice(responses), 0.0
+
+    else:
+        return "3", 3.0  # Default middle value
+
+
+def _get_persona_bias_value(bias: str, base_value: int, scale_max: int = 5) -> int:
+    """Adjust a base value based on persona bias."""
+    if bias == "negative":
+        # Shift toward lower values
+        adjustment = random.choice([-2, -1, -1, 0])
+    elif bias == "positive":
+        # Shift toward higher values
+        adjustment = random.choice([0, 1, 1, 2])
+    elif bias == "mixed_negative":
+        # Mostly negative with some variance
+        adjustment = random.choice([-2, -1, -1, 0, 1])
+    elif bias == "mixed_positive":
+        # Mostly positive with some variance
+        adjustment = random.choice([-1, 0, 1, 1, 2])
+    else:  # neutral
+        adjustment = random.choice([-1, 0, 0, 0, 1])
+
+    result = base_value + adjustment
+    return max(1, min(scale_max, result))
+
+
+async def _generate_persona_answers(
+    questions: list,
+    persona: dict,
+    occupation_name: str,
+    team_name: str,
+) -> list[dict]:
+    """Generate answers using LLM based on persona.
+
+    Returns list of {question_id, value, numeric_value}.
+    """
+    from app.services.llm import get_llm_client, LLMError
+
+    client = get_llm_client()
+
+    # Build question context
+    questions_text = "\n".join([
+        f"{i+1}. [{q.dimension.value}] {q.text} (Type: {q.type.value})"
+        for i, q in enumerate(questions)
+    ])
+
+    prompt = f"""You are role-playing as a survey respondent with the following persona:
+
+PERSONA: {persona['name']}
+{persona['description']}
+Key traits: {', '.join(persona['traits'])}
+
+CONTEXT:
+- You work as a {occupation_name}
+- Your team is: {team_name}
+- You are completing a workplace experience survey
+
+QUESTIONS:
+{questions_text}
+
+For each question, provide your answer as this persona would. For Likert scale questions (1-5 or 1-7), give a number. For percentage questions, give a number 0-100. For free text, give a brief 1-2 sentence response.
+
+Respond in JSON format:
+{{
+  "answers": [
+    {{"question_number": 1, "answer": "4", "reasoning": "brief internal thought"}},
+    {{"question_number": 2, "answer": "2", "reasoning": "brief internal thought"}},
+    ...
+  ]
+}}
+
+Be consistent with your persona's perspective and traits. Your answers should feel authentic to this type of employee."""
+
+    try:
+        response = await client.generate(
+            prompt=prompt,
+            system_prompt="You are a survey simulation assistant. Generate realistic survey responses based on the persona provided. Always respond in valid JSON format.",
+            max_tokens=2000,
+        )
+
+        # Parse JSON response
+        import json
+        import re
+
+        # Try to extract JSON from response
+        content = response.content
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            data = json.loads(json_match.group())
+            llm_answers = data.get("answers", [])
+
+            # Map answers to questions
+            answers = []
+            for i, q in enumerate(questions):
+                # Find matching answer
+                llm_answer = None
+                for a in llm_answers:
+                    if a.get("question_number") == i + 1:
+                        llm_answer = a.get("answer", "")
+                        break
+
+                if llm_answer is None:
+                    # Fallback to random if LLM didn't provide answer
+                    str_val, num_val = _generate_random_answer(q.type.value, q.options)
+                else:
+                    str_val = str(llm_answer)
+                    # Convert to numeric if applicable
+                    try:
+                        num_val = float(llm_answer)
+                    except (ValueError, TypeError):
+                        num_val = 0.0
+
+                answers.append({
+                    "question_id": q.id,
+                    "value": str_val,
+                    "numeric_value": num_val,
+                })
+
+            return answers
+
+    except (LLMError, json.JSONDecodeError, Exception) as e:
+        print(f"LLM persona generation failed: {e}, falling back to biased random")
+
+    # Fallback: Generate biased random answers based on persona
+    answers = []
+    for q in questions:
+        if q.type.value in ("likert_5", "likert_7"):
+            scale_max = 5 if q.type.value == "likert_5" else 7
+            base = scale_max // 2 + 1  # Middle value
+            value = _get_persona_bias_value(persona["bias"], base, scale_max)
+            answers.append({
+                "question_id": q.id,
+                "value": str(value),
+                "numeric_value": float(value),
+            })
+        else:
+            str_val, num_val = _generate_random_answer(q.type.value, q.options)
+            answers.append({
+                "question_id": q.id,
+                "value": str_val,
+                "numeric_value": num_val,
+            })
+
+    return answers
+
+
+@router.post("/generate-sample-data", response_model=SampleDataResult)
+async def generate_sample_data(
+    request: SampleDataRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Generate sample survey responses for testing.
+
+    Modes:
+    - random: Generate random answers (fast, good for stress testing)
+    - persona: Use LLM to generate realistic answers from different personas
+
+    The survey must be in 'active' status to generate responses.
+    """
+    from app.models import Survey, Question, Response, Answer, SurveyStatus
+    from fastapi import HTTPException
+
+    # Get the survey
+    survey = db.query(Survey).filter(Survey.id == request.survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if survey.status != SurveyStatus.ACTIVE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Survey must be active to generate responses. Current status: {survey.status.value}"
+        )
+
+    # Get questions
+    questions = db.query(Question).filter(
+        Question.survey_id == request.survey_id
+    ).order_by(Question.order).all()
+
+    if not questions:
+        raise HTTPException(status_code=400, detail="Survey has no questions")
+
+    # Get occupation and team names for context
+    occupation_name = survey.occupation.name if survey.occupation else "Employee"
+    team_name = survey.team.name if survey.team else "Team"
+
+    responses_created = 0
+    personas_used = []
+
+    # Generate responses
+    for i in range(request.count):
+        # Create response record
+        response = Response(
+            survey_id=request.survey_id,
+            is_complete=True,
+            submitted_at=datetime.utcnow(),
+            completion_time_seconds=random.randint(180, 600),  # 3-10 minutes
+        )
+        db.add(response)
+        db.flush()  # Get the ID
+
+        if request.mode == GenerationMode.RANDOM:
+            # Generate random answers
+            for q in questions:
+                str_val, num_val = _generate_random_answer(q.type.value, q.options)
+                answer = Answer(
+                    response_id=response.id,
+                    question_id=q.id,
+                    value=str_val,
+                    numeric_value=num_val,
+                )
+                db.add(answer)
+
+        else:  # PERSONA mode
+            # Select a persona (cycle through available personas)
+            persona = PERSONAS[i % len(PERSONAS)]
+            personas_used.append(persona["name"])
+
+            # Generate answers using LLM or biased random
+            answers_data = await _generate_persona_answers(
+                questions, persona, occupation_name, team_name
+            )
+
+            for ans in answers_data:
+                answer = Answer(
+                    response_id=response.id,
+                    question_id=ans["question_id"],
+                    value=ans["value"],
+                    numeric_value=ans["numeric_value"],
+                )
+                db.add(answer)
+
+        responses_created += 1
+
+    db.commit()
+
+    # Automatically calculate/recalculate metrics after generating sample data
+    metrics_message = ""
+    try:
+        from app.services.metrics_calculator import MetricsCalculator
+
+        # Delete existing metrics for this survey to force recalculation
+        db.query(MetricResult).filter(
+            MetricResult.survey_id == request.survey_id
+        ).delete()
+        db.commit()
+
+        # Calculate fresh metrics
+        calculator = MetricsCalculator(db)
+        metric_result = calculator.calculate_metrics(survey)
+
+        if metric_result:
+            if metric_result.meets_privacy_threshold:
+                metrics_message = f" Metrics calculated: Flow={metric_result.flow_score:.0f}, Friction={metric_result.friction_score:.0f}"
+            else:
+                metrics_message = f" Metrics pending: {metric_result.respondent_count}/{settings.min_respondents_for_display} responses needed"
+        else:
+            metrics_message = " (metrics calculation returned no result)"
+
+    except Exception as e:
+        print(f"Error calculating metrics after sample data generation: {e}")
+        metrics_message = f" (metrics calculation failed: {str(e)[:50]})"
+
+    return SampleDataResult(
+        success=True,
+        message=f"Generated {responses_created} sample responses using {request.mode.value} mode.{metrics_message}",
+        survey_id=request.survey_id,
+        survey_name=survey.name,
+        responses_created=responses_created,
+        mode=request.mode.value,
+        personas_used=personas_used if personas_used else None,
+    )
+
+
+@router.get("/surveys")
+def list_surveys_for_sample_data(db: Session = Depends(get_db)):
+    """
+    List surveys available for sample data generation.
+
+    Returns all surveys with questions - active ones can receive responses,
+    others are shown for reference.
+    """
+    from app.models import Survey, SurveyStatus, Question
+
+    # Get ALL surveys, not just active - show status so user knows which can receive data
+    surveys = db.query(Survey).all()
+
+    print(f"DEBUG: Found {len(surveys)} total surveys")
+    for s in surveys:
+        print(f"DEBUG: Survey '{s.name}' status={s.status.value}")
+
+    result = []
+    for s in surveys:
+        question_count = db.query(func.count(Question.id)).filter(
+            Question.survey_id == s.id
+        ).scalar() or 0
+
+        response_count = len(s.responses) if s.responses else 0
+
+        # Only include surveys with questions
+        if question_count > 0:
+            result.append({
+                "id": s.id,
+                "name": s.name,
+                "team_name": s.team.name if s.team else "Unknown",
+                "occupation_name": s.occupation.name if s.occupation else "Unknown",
+                "status": s.status.value,
+                "question_count": question_count,
+                "response_count": response_count,
+                "can_generate": s.status == SurveyStatus.ACTIVE,  # Only active surveys can receive data
+            })
+
+    return {"surveys": result, "personas_available": [p["name"] for p in PERSONAS]}

@@ -7,6 +7,7 @@ import {
   useCloseSurvey,
   useGenerateSurveyLink,
   useSurveyStats,
+  useCloneSurvey,
 } from '../api/hooks'
 import type { Survey, Team } from '../api/types'
 import { QuestionMappingModal } from './QuestionMappingModal'
@@ -22,18 +23,22 @@ function SurveyCard({
   onActivate,
   onClose,
   onGenerateLink,
+  onClone,
   isGeneratingQuestions,
   isActivating,
   isClosing,
+  isCloning,
 }: {
   survey: Survey
   onGenerateQuestions: (surveyId: string, useTaskSpecific: boolean) => void
   onActivate: (surveyId: string) => void
   onClose: (surveyId: string) => void
   onGenerateLink: (surveyId: string) => void
+  onClone: (surveyId: string, newName?: string) => void
   isGeneratingQuestions: boolean
   isActivating: boolean
   isClosing: boolean
+  isCloning: boolean
 }) {
   const { data: stats } = useSurveyStats(survey.id)
   const [showLinkModal, setShowLinkModal] = useState(false)
@@ -219,6 +224,16 @@ function SurveyCard({
             >
               View Mapping
             </button>
+            <button
+              onClick={() => onClone(survey.id)}
+              disabled={isCloning}
+              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 flex items-center gap-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              {isCloning ? 'Cloning...' : 'Clone'}
+            </button>
           </>
         )}
       </div>
@@ -289,10 +304,12 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
   const generateQuestions = useGenerateQuestions()
   const activateSurvey = useActivateSurvey()
   const closeSurvey = useCloseSurvey()
+  const cloneSurvey = useCloneSurvey()
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newSurveyName, setNewSurveyName] = useState('')
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [cloningId, setCloningId] = useState<string | null>(null)
 
   const handleCreateSurvey = async () => {
     if (!newSurveyName.trim()) return
@@ -347,6 +364,18 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
     }
   }
 
+  const handleClone = async (surveyId: string, newName?: string) => {
+    setCloningId(surveyId)
+    try {
+      await cloneSurvey.mutateAsync({ surveyId, newName })
+      refetch()
+    } catch (err) {
+      console.error('Failed to clone survey:', err)
+    } finally {
+      setCloningId(null)
+    }
+  }
+
   const activeSurveys = surveys?.filter(s => s.status === 'active') || []
   const draftSurveys = surveys?.filter(s => s.status === 'draft') || []
   const closedSurveys = surveys?.filter(s => s.status === 'closed') || []
@@ -386,9 +415,11 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     onActivate={handleActivate}
                     onClose={handleClose}
                     onGenerateLink={() => {}}
+                    onClone={handleClone}
                     isGeneratingQuestions={processingId === survey.id && generateQuestions.isPending}
                     isActivating={processingId === survey.id && activateSurvey.isPending}
                     isClosing={processingId === survey.id && closeSurvey.isPending}
+                    isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
               </div>
@@ -408,9 +439,11 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     onActivate={handleActivate}
                     onClose={handleClose}
                     onGenerateLink={() => {}}
+                    onClone={handleClone}
                     isGeneratingQuestions={processingId === survey.id && generateQuestions.isPending}
                     isActivating={processingId === survey.id && activateSurvey.isPending}
                     isClosing={processingId === survey.id && closeSurvey.isPending}
+                    isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
               </div>
@@ -430,9 +463,11 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     onActivate={handleActivate}
                     onClose={handleClose}
                     onGenerateLink={() => {}}
+                    onClone={handleClone}
                     isGeneratingQuestions={processingId === survey.id && generateQuestions.isPending}
                     isActivating={processingId === survey.id && activateSurvey.isPending}
                     isClosing={processingId === survey.id && closeSurvey.isPending}
+                    isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
               </div>

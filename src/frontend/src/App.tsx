@@ -6,6 +6,7 @@ import { SurveyComplete } from './pages/SurveyComplete'
 import { TeamsPage } from './pages/TeamsPage'
 import { OpportunitiesPage } from './pages/OpportunitiesPage'
 import { ExecutiveDashboard } from './pages/ExecutiveDashboard'
+import { OccupationDetailPage } from './pages/OccupationDetailPage'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamDashboard />} />
           <Route path="teams/:teamId/opportunities" element={<OpportunitiesPage />} />
+          <Route path="occupations/:occupationId" element={<OccupationDetailPage />} />
         </Route>
 
         {/* 404 fallback */}

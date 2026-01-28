@@ -66,6 +66,69 @@ class TaskResponse(BaseSchema):
     created_at: datetime
 
 
+# Global Task schemas
+class GlobalTaskCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: TaskCategory = TaskCategory.CORE
+    faethm_task_id: Optional[str] = None
+
+
+class GlobalTaskUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[TaskCategory] = None
+
+
+class GlobalTaskResponse(BaseSchema):
+    id: str
+    faethm_task_id: Optional[str]
+    name: str
+    description: Optional[str]
+    category: TaskCategory
+    is_custom: bool
+    source: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# Occupation Task Assignment schemas
+class OccupationTaskCreate(BaseModel):
+    global_task_id: str
+    time_percentage: float = Field(default=0.0, ge=0.0, le=100.0)
+    category_override: Optional[TaskCategory] = None
+    display_order: int = 0
+
+
+class OccupationTaskUpdate(BaseModel):
+    time_percentage: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    category_override: Optional[TaskCategory] = None
+    display_order: Optional[int] = None
+
+
+class OccupationTaskResponse(BaseSchema):
+    id: str
+    occupation_id: str
+    global_task_id: str
+    time_percentage: float
+    category_override: Optional[TaskCategory]
+    display_order: int
+    created_at: datetime
+    updated_at: datetime
+    global_task: GlobalTaskResponse
+
+
+class BulkTimeAllocationUpdate(BaseModel):
+    allocations: list[dict]  # [{id: str, time_percentage: float}]
+
+
+class AllocationSummary(BaseModel):
+    occupation_id: str
+    total_tasks: int
+    total_percentage: float
+    tasks_with_allocation: int
+
+
 # Friction Signal schemas
 class FrictionSignalCreate(BaseModel):
     task_id: str

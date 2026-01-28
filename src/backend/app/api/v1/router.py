@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     responses,
     status,
     surveys,
+    tasks,
     teams,
 )
 
@@ -23,3 +24,4 @@ api_router.include_router(metrics.router)
 api_router.include_router(opportunities.router)
 api_router.include_router(status.router)
 api_router.include_router(llm.router)
+api_router.include_router(tasks.router)

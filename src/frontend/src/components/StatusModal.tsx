@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useSystemStatus, useTestLLM, useLLMConfig } from '../api/hooks'
+import { useSystemStatus, useTestLLM, useLLMConfig, useResetAll, useResetTasks, useResetOccupation, useDeleteOccupation, useSurveysForSampleData, useGenerateSampleData } from '../api/hooks'
 import type { LLMTestResult, LLMConfigResponse } from '../api/types'
+import { VERSION as FRONTEND_VERSION } from '../version'
 
 interface StatusModalProps {
   isOpen: boolean
@@ -11,9 +12,91 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
   const { data: status, isLoading, error, refetch } = useSystemStatus()
   const testLLM = useTestLLM()
   const getLLMConfig = useLLMConfig()
+  const resetAll = useResetAll()
+  const resetTasks = useResetTasks()
+  const resetOccupation = useResetOccupation()
+  const deleteOccupation = useDeleteOccupation()
+  const { data: surveysData, refetch: refetchSurveys } = useSurveysForSampleData()
+  const generateSampleData = useGenerateSampleData()
 
   const [llmTestResult, setLLMTestResult] = useState<LLMTestResult | null>(null)
   const [llmConfig, setLLMConfig] = useState<LLMConfigResponse | null>(null)
+  const [confirmingReset, setConfirmingReset] = useState<'all' | 'tasks' | null>(null)
+  const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Sample data generation state
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('')
+  const [sampleCount, setSampleCount] = useState<number>(5)
+  const [sampleMode, setSampleMode] = useState<'random' | 'persona'>('random')
+  const [sampleDataResult, setSampleDataResult] = useState<{ type: 'success' | 'error'; text: string; personas?: string[] } | null>(null)
+
+  const handleResetAll = async () => {
+    try {
+      const result = await resetAll.mutateAsync()
+      setResetMessage({ type: 'success', text: `Database reset: ${result.message || 'All data cleared'}` })
+      setConfirmingReset(null)
+      refetch()
+    } catch (err) {
+      setResetMessage({ type: 'error', text: `Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+    }
+  }
+
+  const handleResetTasks = async () => {
+    try {
+      const result = await resetTasks.mutateAsync()
+      setResetMessage({ type: 'success', text: `Tasks reset: ${result.deleted.occupation_tasks || 0} assignments, ${result.deleted.global_tasks || 0} tasks cleared` })
+      setConfirmingReset(null)
+      refetch()
+    } catch (err) {
+      setResetMessage({ type: 'error', text: `Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+    }
+  }
+
+  const handleResetOccupation = async (occId: string, occName: string) => {
+    if (!window.confirm(`Reset task assignments for "${occName}"? This will remove all task links for this occupation.`)) return
+    try {
+      const result = await resetOccupation.mutateAsync(occId)
+      setResetMessage({ type: 'success', text: `Reset "${occName}": ${result.deleted.occupation_tasks || 0} task assignments cleared` })
+      refetch()
+    } catch (err) {
+      setResetMessage({ type: 'error', text: `Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+    }
+  }
+
+  const handleDeleteOccupation = async (occId: string, occName: string) => {
+    if (!window.confirm(`DELETE "${occName}" completely? This cannot be undone and will remove the occupation and all its data.`)) return
+    try {
+      await deleteOccupation.mutateAsync(occId)
+      setResetMessage({ type: 'success', text: `Deleted "${occName}" and all associated data` })
+      refetch()
+    } catch (err) {
+      setResetMessage({ type: 'error', text: `Delete failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+    }
+  }
+
+  const handleGenerateSampleData = async () => {
+    if (!selectedSurveyId) {
+      setSampleDataResult({ type: 'error', text: 'Please select a survey' })
+      return
+    }
+    try {
+      setSampleDataResult(null)
+      const result = await generateSampleData.mutateAsync({
+        survey_id: selectedSurveyId,
+        count: sampleCount,
+        mode: sampleMode,
+      })
+      setSampleDataResult({
+        type: 'success',
+        text: result.message,
+        personas: result.personas_used || undefined,
+      })
+      refetch()
+      refetchSurveys()
+    } catch (err) {
+      setSampleDataResult({ type: 'error', text: `Generation failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+    }
+  }
 
   if (!isOpen) return null
 
@@ -55,6 +138,22 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
             </div>
           ) : status ? (
             <div className="space-y-6">
+              {/* Version Info */}
+              <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">KWeX {status.version?.backend_name || ''}</h3>
+                    <p className="text-sm text-gray-600">
+                      Backend: v{status.version?.backend || 'unknown'} | Frontend: v{FRONTEND_VERSION}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>{status.environment}</p>
+                    <p>{status.version?.backend_build_date}</p>
+                  </div>
+                </div>
+              </section>
+
               {/* Faethm Connection Status */}
               <section>
                 <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -279,7 +378,7 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                         <button
                           onClick={async () => {
                             setLLMTestResult(null)
-                            const result = await testLLM.mutateAsync()
+                            const result = await testLLM.mutateAsync(undefined)
                             setLLMTestResult(result)
                           }}
                           disabled={testLLM.isPending}
@@ -371,6 +470,206 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                 </section>
               )}
 
+              {/* Data Management */}
+              <section>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                  Data Management (Development)
+                </h3>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  {resetMessage && (
+                    <div className={`mb-4 p-3 rounded text-sm ${
+                      resetMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
+                    }`}>
+                      {resetMessage.text}
+                      <button onClick={() => setResetMessage(null)} className="ml-2 text-gray-500 hover:text-gray-700">&times;</button>
+                    </div>
+                  )}
+
+                  {confirmingReset === 'all' ? (
+                    <div className="bg-red-100 border border-red-300 rounded-lg p-4">
+                      <p className="text-red-800 font-medium mb-2">Confirm Full Database Reset</p>
+                      <p className="text-red-700 text-sm mb-4">
+                        This will delete ALL data: occupations, tasks, teams, surveys, questions, responses, and opportunities. This cannot be undone.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleResetAll}
+                          disabled={resetAll.isPending}
+                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {resetAll.isPending ? 'Resetting...' : 'Yes, Reset Everything'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingReset(null)}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : confirmingReset === 'tasks' ? (
+                    <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4">
+                      <p className="text-yellow-800 font-medium mb-2">Confirm Task Reset</p>
+                      <p className="text-yellow-700 text-sm mb-4">
+                        This will delete all task assignments and global tasks. Occupations, teams, and surveys will remain.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleResetTasks}
+                          disabled={resetTasks.isPending}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                        >
+                          {resetTasks.isPending ? 'Resetting...' : 'Yes, Reset Tasks'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingReset(null)}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-sm text-orange-800">
+                        Use these options to reset data during development. All actions require confirmation.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setConfirmingReset('all')}
+                          className="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                        >
+                          Reset All Data
+                        </button>
+                        <button
+                          onClick={() => setConfirmingReset('tasks')}
+                          className="px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
+                        >
+                          Reset Tasks Only
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Sample Data Generation */}
+              <section>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                  Sample Data Generation
+                </h3>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  {sampleDataResult && (
+                    <div className={`mb-4 p-3 rounded text-sm ${
+                      sampleDataResult.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
+                    }`}>
+                      <div>{sampleDataResult.text}</div>
+                      {sampleDataResult.personas && sampleDataResult.personas.length > 0 && (
+                        <div className="mt-2 text-xs">
+                          Personas used: {sampleDataResult.personas.join(', ')}
+                        </div>
+                      )}
+                      <button onClick={() => setSampleDataResult(null)} className="ml-2 text-gray-500 hover:text-gray-700">&times;</button>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-purple-800 mb-4">
+                    Generate sample survey responses for testing metrics and dashboards.
+                  </p>
+
+                  {surveysData && surveysData.surveys.length > 0 ? (
+                    <div className="space-y-4">
+                      {/* Survey Selection */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Survey</label>
+                        <select
+                          value={selectedSurveyId}
+                          onChange={(e) => setSelectedSurveyId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="">Choose a survey...</option>
+                          {surveysData.surveys.map((s: { id: string; name: string; team_name: string; status: string; question_count: number; response_count: number; can_generate?: boolean }) => (
+                            <option key={s.id} value={s.id} disabled={s.status !== 'active'}>
+                              {s.status !== 'active' ? `[${s.status.toUpperCase()}] ` : ''}{s.name} ({s.team_name}) - {s.question_count}q, {s.response_count} responses
+                            </option>
+                          ))}
+                        </select>
+                        {selectedSurveyId && surveysData.surveys.find((s: { id: string; status: string }) => s.id === selectedSurveyId)?.status !== 'active' && (
+                          <p className="text-xs text-red-600 mt-1">This survey must be activated before generating sample data.</p>
+                        )}
+                      </div>
+
+                      {/* Count and Mode */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Number of Responses</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={sampleCount}
+                            onChange={(e) => setSampleCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Generation Mode</label>
+                          <select
+                            value={sampleMode}
+                            onChange={(e) => setSampleMode(e.target.value as 'random' | 'persona')}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="random">Random (fast)</option>
+                            <option value="persona">Persona-based (LLM, realistic)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Mode Description */}
+                      <div className="text-xs text-gray-600 bg-white rounded p-2">
+                        {sampleMode === 'random' ? (
+                          <>
+                            <strong>Random Mode:</strong> Generates statistically distributed random answers. Fast and good for stress testing.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Persona Mode:</strong> Uses LLM to generate realistic answers from different employee personas
+                            (e.g., "Frustrated Veteran", "Enthusiastic New Hire", "Burned Out Manager").
+                            Slower but produces more realistic data patterns.
+                            {surveysData.personas_available && (
+                              <div className="mt-1">
+                                Available personas: {surveysData.personas_available.slice(0, 4).join(', ')}
+                                {surveysData.personas_available.length > 4 && ` + ${surveysData.personas_available.length - 4} more`}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Generate Button */}
+                      <button
+                        onClick={handleGenerateSampleData}
+                        disabled={
+                          generateSampleData.isPending ||
+                          !selectedSurveyId ||
+                          surveysData.surveys.find((s: { id: string; status: string }) => s.id === selectedSurveyId)?.status !== 'active'
+                        }
+                        className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {generateSampleData.isPending ? 'Generating...' : `Generate ${sampleCount} Sample Response${sampleCount > 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <p>No surveys with questions found.</p>
+                      <p className="text-xs mt-1">Create a survey and generate questions first, then activate it.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
               {/* Synced Occupations */}
               {status.synced_occupations.length > 0 && (
                 <section>
@@ -386,6 +685,7 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                           <th className="px-4 py-2 text-center font-medium text-gray-600">Tasks</th>
                           <th className="px-4 py-2 text-center font-medium text-gray-600">Teams</th>
                           <th className="px-4 py-2 text-center font-medium text-gray-600">Surveys</th>
+                          <th className="px-4 py-2 text-center font-medium text-gray-600">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -398,6 +698,26 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                             <td className="px-4 py-2 text-center">{occ.task_count}</td>
                             <td className="px-4 py-2 text-center">{occ.team_count}</td>
                             <td className="px-4 py-2 text-center">{occ.survey_count}</td>
+                            <td className="px-4 py-2 text-center">
+                              <div className="flex justify-center gap-1">
+                                <button
+                                  onClick={() => handleResetOccupation(occ.id, occ.name)}
+                                  disabled={resetOccupation.isPending}
+                                  className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50"
+                                  title="Reset task assignments"
+                                >
+                                  Reset
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOccupation(occ.id, occ.name)}
+                                  disabled={deleteOccupation.isPending}
+                                  className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                                  title="Delete occupation"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -429,7 +749,7 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
   )
 }
 
-function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
+function StatCard({ label, value, icon: _icon }: { label: string; value: number; icon: string }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
       <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>

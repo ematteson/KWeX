@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -123,6 +123,7 @@ class Occupation(Base):
     tasks: Mapped[list["Task"]] = relationship(back_populates="occupation", cascade="all, delete")
     teams: Mapped[list["Team"]] = relationship(back_populates="occupation")
     surveys: Mapped[list["Survey"]] = relationship(back_populates="occupation")
+    task_assignments: Mapped[list["OccupationTask"]] = relationship(back_populates="occupation", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -144,6 +145,48 @@ class Task(Base):
         back_populates="task", cascade="all, delete"
     )
     questions: Mapped[list["Question"]] = relationship(back_populates="task")
+
+
+class GlobalTask(Base):
+    """Global task library - tasks that can be assigned to any occupation."""
+
+    __tablename__ = "global_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    faethm_task_id: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    category: Mapped[TaskCategory] = mapped_column(Enum(TaskCategory), default=TaskCategory.CORE)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[str] = mapped_column(String(50), default="faethm")  # faethm, custom
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    occupation_assignments: Mapped[list["OccupationTask"]] = relationship(
+        back_populates="global_task", cascade="all, delete-orphan"
+    )
+
+
+class OccupationTask(Base):
+    """Junction table for occupation-task assignments with time allocation."""
+
+    __tablename__ = "occupation_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    occupation_id: Mapped[str] = mapped_column(String(36), ForeignKey("occupations.id", ondelete="CASCADE"))
+    global_task_id: Mapped[str] = mapped_column(String(36), ForeignKey("global_tasks.id", ondelete="CASCADE"))
+    time_percentage: Mapped[float] = mapped_column(Float, default=0.0)
+    category_override: Mapped[Optional[TaskCategory]] = mapped_column(Enum(TaskCategory), nullable=True)
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    occupation: Mapped["Occupation"] = relationship(back_populates="task_assignments")
+    global_task: Mapped["GlobalTask"] = relationship(back_populates="occupation_assignments")
+
+    __table_args__ = (UniqueConstraint('occupation_id', 'global_task_id', name='uq_occupation_task'),)
 
 
 class FrictionSignal(Base):

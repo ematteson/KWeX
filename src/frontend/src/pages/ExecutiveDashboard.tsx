@@ -305,25 +305,25 @@ export function ExecutiveDashboard() {
                 <div className="grid grid-cols-4 gap-2 text-center">
                   <div>
                     <div className={clsx('text-lg font-bold', getScoreColor(team.flow_score))}>
-                      {team.flow_score ?? '—'}
+                      {team.flow_score != null ? Math.round(team.flow_score) : '—'}
                     </div>
                     <div className="text-xs text-pearson-gray-500">Flow</div>
                   </div>
                   <div>
                     <div className={clsx('text-lg font-bold', getScoreColor(team.friction_score, true))}>
-                      {team.friction_score ?? '—'}
+                      {team.friction_score != null ? Math.round(team.friction_score) : '—'}
                     </div>
                     <div className="text-xs text-pearson-gray-500">Friction</div>
                   </div>
                   <div>
                     <div className={clsx('text-lg font-bold', getScoreColor(team.safety_score))}>
-                      {team.safety_score ?? '—'}
+                      {team.safety_score != null ? Math.round(team.safety_score) : '—'}
                     </div>
                     <div className="text-xs text-pearson-gray-500">Safety</div>
                   </div>
                   <div>
                     <div className={clsx('text-lg font-bold', getScoreColor(team.portfolio_balance_score))}>
-                      {team.portfolio_balance_score ?? '—'}
+                      {team.portfolio_balance_score != null ? Math.round(team.portfolio_balance_score) : '—'}
                     </div>
                     <div className="text-xs text-pearson-gray-500">Portfolio</div>
                   </div>

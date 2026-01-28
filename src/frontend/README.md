@@ -6,9 +6,11 @@ React TypeScript frontend for the KWeX (Knowledge Worker Experience) survey tool
 
 The frontend provides:
 - **Survey Collection**: Anonymous survey interface for respondents
+- **Survey Management**: Create, generate questions, activate, clone surveys
 - **Team Dashboard**: Core 4 metrics visualization for team leads
 - **Executive Dashboard**: Cross-team metrics comparison
 - **Opportunities View**: RICE-scored improvement recommendations
+- **System Status**: Admin panel for data management and sample data generation
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Project Structure
@@ -28,7 +30,11 @@ src/frontend/
 │   │   ├── MetricCard.tsx        # Individual metric display
 │   │   ├── MetricsTrendChart.tsx # Historical trend lines
 │   │   ├── OpportunityCard.tsx   # RICE opportunity display
-│   │   └── ProgressBar.tsx       # Completion indicator
+│   │   ├── ProgressBar.tsx       # Completion indicator
+│   │   ├── StatusModal.tsx       # System status & data management
+│   │   ├── SurveyManagement.tsx  # Survey CRUD with clone support
+│   │   ├── SurveyPreviewModal.tsx # Survey question preview
+│   │   └── QuestionMappingModal.tsx # Question-to-metric mapping
 │   ├── pages/
 │   │   ├── ExecutiveDashboard.tsx  # Cross-team overview
 │   │   ├── TeamDashboard.tsx       # Team metrics view
@@ -200,6 +206,15 @@ Data fetching is managed through React Query hooks in `src/api/hooks.ts`:
 const { data: metrics, isLoading } = useTeamMetrics(teamId);
 const { data: opportunities } = useTeamOpportunities(teamId);
 const { mutate: submitResponse } = useSubmitSurveyResponse();
+
+// Survey management
+const { mutate: cloneSurvey } = useCloneSurvey();
+const { mutate: generateQuestions } = useGenerateQuestions();
+
+// Admin/status
+const { data: status } = useSystemStatus();
+const { mutate: generateSampleData } = useGenerateSampleData();
+const { mutate: resetAll } = useResetAll();
 ```
 
 ### Type Definitions

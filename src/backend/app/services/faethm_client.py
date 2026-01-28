@@ -269,49 +269,98 @@ class FaethmClient:
         return None
 
     def get_tasks(self, faethm_code: str) -> list[dict]:
-        """Get tasks for an occupation.
+        """Get tasks for an occupation from the Faethm API.
 
-        Note: The CSV doesn't include tasks, so we generate generic ones.
-        These can be enriched by the LLM later.
+        Calls: GET /di/v1/occupations/{occupation_id}/tasks/skills
+        Returns tasks with time_percent from Faethm's ontology.
+
+        API Response structure:
+        {
+            "occupation": {...},
+            "occupation_level": null,
+            "tasks": [
+                {
+                    "id": "TK000088",
+                    "name": "Task description...",
+                    "time_percent": 9.22,
+                    "linked_skills": [...]
+                },
+                ...
+            ]
+        }
         """
-        occupation = self.get_occupation(faethm_code)
-        if not occupation:
+        if self.use_mock:
+            print(f"FaethmClient: Mock mode - returning empty tasks for {faethm_code}")
             return []
-        # Generate generic tasks based on occupation
-        return self._generate_tasks_for_occupation(faethm_code, occupation)
 
-    def _generate_tasks_for_occupation(self, code: str, occupation: dict) -> list[dict]:
-        """Generate generic tasks for an occupation."""
-        name = occupation.get("name", "")
+        try:
+            endpoint = f"/di/v1/occupations/{faethm_code}/tasks/skills"
+            print(f"FaethmClient: Fetching tasks from API: {endpoint}")
 
-        # Generate 3-5 generic tasks
-        tasks = [
-            {
-                "faethm_task_id": f"{code}-T01",
-                "name": f"Core {name} responsibilities",
-                "description": f"Primary responsibilities and duties for {name}",
-                "category": "core",
-            },
-            {
-                "faethm_task_id": f"{code}-T02",
-                "name": "Stakeholder communication",
-                "description": "Communicate with stakeholders and team members",
-                "category": "support",
-            },
-            {
-                "faethm_task_id": f"{code}-T03",
-                "name": "Documentation and reporting",
-                "description": "Maintain documentation and create reports",
-                "category": "admin",
-            },
-            {
-                "faethm_task_id": f"{code}-T04",
-                "name": "Process improvement",
-                "description": "Identify and implement process improvements",
-                "category": "core",
-            },
+            response = self._call_api(endpoint)
+
+            # Response is a dict with "tasks" key containing the task list
+            if not isinstance(response, dict):
+                print(f"FaethmClient: Unexpected response type: {type(response)}")
+                return []
+
+            task_list = response.get("tasks", [])
+            print(f"FaethmClient: Found {len(task_list)} tasks in response")
+
+            tasks = []
+            for task_data in task_list:
+                if not isinstance(task_data, dict):
+                    continue
+
+                # Extract skill names for reference
+                linked_skills = task_data.get("linked_skills", [])
+                skill_names = [s.get("name", "") for s in linked_skills if isinstance(s, dict)]
+
+                task = {
+                    "faethm_task_id": task_data.get("id"),
+                    "name": task_data.get("name", ""),
+                    "description": "",  # API doesn't provide task description, name IS the description
+                    "time_percent": task_data.get("time_percent", 0),
+                    "category": self._categorize_task(task_data.get("name", "")),
+                    "linked_skills": linked_skills,
+                    "skill_names": skill_names,  # Flattened for easy display
+                }
+                tasks.append(task)
+
+            print(f"FaethmClient: Parsed {len(tasks)} tasks for {faethm_code}")
+            return tasks
+
+        except Exception as e:
+            import traceback
+            print(f"FaethmClient: Error fetching tasks for {faethm_code}: {e}")
+            print(f"FaethmClient: Traceback: {traceback.format_exc()}")
+            return []
+
+    def _categorize_task(self, task_name: str) -> str:
+        """Categorize a task based on its name.
+
+        Returns: 'core', 'support', or 'admin'
+        """
+        name_lower = task_name.lower()
+
+        # Admin tasks
+        admin_keywords = [
+            "administrative", "admin", "paperwork", "filing", "scheduling",
+            "record", "documentation", "report", "compliance", "audit"
         ]
-        return tasks
+        if any(kw in name_lower for kw in admin_keywords):
+            return "admin"
+
+        # Support tasks
+        support_keywords = [
+            "support", "assist", "help", "coordinate", "communicate",
+            "meeting", "collaborate", "training", "mentoring"
+        ]
+        if any(kw in name_lower for kw in support_keywords):
+            return "support"
+
+        # Default to core
+        return "core"
 
     def get_skills(self, faethm_code: str) -> list[dict]:
         """Get skills for an occupation.

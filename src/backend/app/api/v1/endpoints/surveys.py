@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.models import Survey, Team, Occupation, Response, SurveyStatus
+from app.models import Survey, Team, Occupation, Response, SurveyStatus, Question
 from app.schemas import SurveyCreate, SurveyResponse, SurveyResponseStats, QuestionResponse
 from app.services.survey_generator import SurveyGenerator
 
@@ -202,6 +202,93 @@ def close_survey(survey_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(survey)
     return survey
+
+
+@router.post("/{survey_id}/clone", response_model=SurveyResponse)
+def clone_survey(
+    survey_id: str,
+    new_name: Optional[str] = None,
+    new_team_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Clone a survey to create a new instance with the same questions.
+
+    Useful for running recurring surveys (e.g., quarterly) or using the same
+    survey template for different teams.
+
+    - new_name: Optional new name (defaults to "{original name} (Copy)")
+    - new_team_id: Optional different team (defaults to same team)
+
+    The cloned survey will be in DRAFT status with all questions copied.
+    """
+    # Get the original survey
+    original = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    # Validate new team if provided
+    if new_team_id:
+        team = db.query(Team).filter(Team.id == new_team_id).first()
+        if not team:
+            raise HTTPException(status_code=404, detail="New team not found")
+
+    # Generate new name if not provided
+    if not new_name:
+        # Check for existing copies to increment number
+        base_name = original.name.rstrip()
+        if base_name.endswith(")") and " (Copy" in base_name:
+            # Already a copy, extract base name
+            base_name = base_name[:base_name.rfind(" (Copy")]
+
+        # Count existing copies
+        existing_copies = db.query(Survey).filter(
+            Survey.name.like(f"{base_name} (Copy%")
+        ).count()
+
+        if existing_copies == 0:
+            new_name = f"{base_name} (Copy)"
+        else:
+            new_name = f"{base_name} (Copy {existing_copies + 1})"
+
+    # Create the new survey
+    cloned_survey = Survey(
+        name=new_name,
+        occupation_id=original.occupation_id,
+        team_id=new_team_id or original.team_id,
+        status=SurveyStatus.DRAFT,
+        anonymous_mode=original.anonymous_mode,
+        estimated_completion_minutes=original.estimated_completion_minutes,
+    )
+    db.add(cloned_survey)
+    db.flush()  # Get the new survey ID
+
+    # Clone all questions
+    original_questions = db.query(Question).filter(
+        Question.survey_id == survey_id
+    ).order_by(Question.order).all()
+
+    for q in original_questions:
+        cloned_question = Question(
+            survey_id=cloned_survey.id,
+            task_id=q.task_id,
+            friction_signal_id=q.friction_signal_id,
+            dimension=q.dimension,
+            metric_mapping=q.metric_mapping,
+            text=q.text,
+            type=q.type,
+            options=q.options,
+            order=q.order,
+            required=q.required,
+            llm_template_id=q.llm_template_id,
+            generation_method=q.generation_method,
+        )
+        db.add(cloned_question)
+
+    db.commit()
+    db.refresh(cloned_survey)
+
+    return cloned_survey
 
 
 @router.get("/{survey_id}/link")

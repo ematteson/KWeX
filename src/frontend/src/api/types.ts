@@ -4,6 +4,7 @@ export type QuestionType = 'likert_5' | 'likert_7' | 'multiple_choice' | 'percen
 export type SurveyStatus = 'draft' | 'active' | 'closed'
 export type OpportunityStatus = 'identified' | 'in_progress' | 'completed' | 'deferred'
 export type TrendDirection = 'up' | 'down' | 'stable'
+export type TaskCategory = 'core' | 'support' | 'admin'
 
 // Team
 export interface Team {
@@ -194,6 +195,13 @@ export interface FaethmStatus {
   csv_occupations_count: number
 }
 
+export interface VersionInfo {
+  backend: string
+  backend_name: string
+  backend_build_date: string
+  frontend?: string
+}
+
 export interface DatabaseStatus {
   occupations_synced: number
   tasks_count: number
@@ -202,6 +210,8 @@ export interface DatabaseStatus {
   questions_count: number
   responses_count: number
   occupations_with_tasks: number
+  global_tasks_count: number
+  occupation_task_assignments: number
 }
 
 export interface OccupationSummary {
@@ -209,11 +219,14 @@ export interface OccupationSummary {
   name: string
   faethm_code: string | null
   task_count: number
+  curated_tasks_count: number
   team_count: number
   survey_count: number
+  enriched_tasks_count: number
 }
 
 export interface SystemStatus {
+  version: VersionInfo
   timestamp: string
   environment: string
   faethm: FaethmStatus
@@ -324,4 +337,66 @@ export interface LLMConfigResponse {
   loaded_settings: Record<string, string | number | boolean>
   os_environ_llm_vars: Record<string, string>
   why_mock_mode: string
+}
+
+// Global Task Types
+export interface GlobalTask {
+  id: string
+  faethm_task_id: string | null
+  name: string
+  description: string | null
+  category: TaskCategory
+  is_custom: boolean
+  source: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OccupationTask {
+  id: string
+  occupation_id: string
+  global_task_id: string
+  time_percentage: number
+  category_override: TaskCategory | null
+  display_order: number
+  created_at: string
+  updated_at: string
+  global_task: GlobalTask
+}
+
+export interface GlobalTaskCreate {
+  name: string
+  description?: string
+  category?: TaskCategory
+  faethm_task_id?: string
+}
+
+export interface GlobalTaskUpdate {
+  name?: string
+  description?: string
+  category?: TaskCategory
+}
+
+export interface OccupationTaskCreate {
+  global_task_id: string
+  time_percentage?: number
+  category_override?: TaskCategory
+  display_order?: number
+}
+
+export interface OccupationTaskUpdate {
+  time_percentage?: number
+  category_override?: TaskCategory
+  display_order?: number
+}
+
+export interface BulkTimeAllocationUpdate {
+  allocations: { id: string; time_percentage: number }[]
+}
+
+export interface AllocationSummary {
+  occupation_id: string
+  total_tasks: number
+  total_percentage: number
+  tasks_with_allocation: number
 }

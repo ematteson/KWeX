@@ -20,6 +20,15 @@ import type {
   SurveyQuestionMapping,
   LLMTestResult,
   LLMConfigResponse,
+  GlobalTask,
+  GlobalTaskCreate,
+  GlobalTaskUpdate,
+  OccupationTask,
+  OccupationTaskCreate,
+  OccupationTaskUpdate,
+  BulkTimeAllocationUpdate,
+  AllocationSummary,
+  TaskCategory,
 } from './types'
 
 // Teams
@@ -185,6 +194,29 @@ export function useCloseSurvey() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
       queryClient.invalidateQueries({ queryKey: ['surveys', 'team', data.team_id] })
+    },
+  })
+}
+
+export function useCloneSurvey() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ surveyId, newName, newTeamId }: {
+      surveyId: string
+      newName?: string
+      newTeamId?: string
+    }) => {
+      const params = new URLSearchParams()
+      if (newName) params.set('new_name', newName)
+      if (newTeamId) params.set('new_team_id', newTeamId)
+      const url = params.toString() ? `/surveys/${surveyId}/clone?${params}` : `/surveys/${surveyId}/clone`
+      const { data } = await apiClient.post<Survey>(url)
+      return data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['surveys', 'team', data.team_id] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
     },
   })
 }
@@ -497,6 +529,328 @@ export function useLLMConfig() {
     mutationFn: async () => {
       const { data } = await apiClient.get<LLMConfigResponse>('/status/llm/config')
       return data
+    },
+  })
+}
+
+// ============================================================================
+// Global Task Library Hooks
+// ============================================================================
+
+export interface GlobalTasksParams {
+  search?: string
+  category?: TaskCategory
+  source?: string
+  skip?: number
+  limit?: number
+}
+
+export function useGlobalTasks(params?: GlobalTasksParams) {
+  return useQuery({
+    queryKey: ['globalTasks', params],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GlobalTask[]>('/tasks', { params })
+      return data
+    },
+  })
+}
+
+export function useGlobalTask(taskId: string) {
+  return useQuery({
+    queryKey: ['globalTasks', taskId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GlobalTask>(`/tasks/${taskId}`)
+      return data
+    },
+    enabled: !!taskId,
+  })
+}
+
+export function useCreateGlobalTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (task: GlobalTaskCreate) => {
+      const { data } = await apiClient.post<GlobalTask>('/tasks', task)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+    },
+  })
+}
+
+export function useUpdateGlobalTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: GlobalTaskUpdate }) => {
+      const { data } = await apiClient.put<GlobalTask>(`/tasks/${taskId}`, updates)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+    },
+  })
+}
+
+export function useDeleteGlobalTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      await apiClient.delete(`/tasks/${taskId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+    },
+  })
+}
+
+// ============================================================================
+// Occupation Task Assignment Hooks
+// ============================================================================
+
+export function useOccupationTasks(occupationId: string) {
+  return useQuery({
+    queryKey: ['occupationTasks', occupationId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<OccupationTask[]>(`/tasks/occupations/${occupationId}`)
+      return data
+    },
+    enabled: !!occupationId,
+  })
+}
+
+export function useAssignTask(occupationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (assignment: OccupationTaskCreate) => {
+      const { data } = await apiClient.post<OccupationTask>(
+        `/tasks/occupations/${occupationId}`,
+        assignment
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks', occupationId] })
+    },
+  })
+}
+
+export function useUpdateTaskAssignment(occupationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ assignmentId, updates }: { assignmentId: string; updates: OccupationTaskUpdate }) => {
+      const { data } = await apiClient.patch<OccupationTask>(
+        `/tasks/occupations/${occupationId}/${assignmentId}`,
+        updates
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks', occupationId] })
+    },
+  })
+}
+
+export function useRemoveTaskAssignment(occupationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (assignmentId: string) => {
+      await apiClient.delete(`/tasks/occupations/${occupationId}/${assignmentId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks', occupationId] })
+    },
+  })
+}
+
+export function useBulkUpdateTimeAllocations(occupationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (allocations: BulkTimeAllocationUpdate) => {
+      const { data } = await apiClient.put<{ updated: number; errors: { id: string; error: string }[] }>(
+        `/tasks/occupations/${occupationId}/time-allocations`,
+        allocations
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks', occupationId] })
+    },
+  })
+}
+
+export function useAllocationSummary(occupationId: string) {
+  return useQuery({
+    queryKey: ['occupationTasks', occupationId, 'summary'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<AllocationSummary>(`/tasks/occupations/${occupationId}/summary`)
+      return data
+    },
+    enabled: !!occupationId,
+  })
+}
+
+export function useOccupation(occupationId: string) {
+  return useQuery({
+    queryKey: ['occupations', occupationId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Occupation>(`/occupations/${occupationId}`)
+      return data
+    },
+    enabled: !!occupationId,
+  })
+}
+
+export function useSyncOccupationTasks(occupationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<{ occupation_id: string; tasks_synced: number }>(
+        `/occupations/${occupationId}/sync-tasks`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks', occupationId] })
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+    },
+  })
+}
+
+// ============================================================================
+// Reset / Data Management Hooks
+// ============================================================================
+
+export interface ResetResult {
+  status: string
+  deleted: {
+    occupations?: number
+    global_tasks?: number
+    occupation_tasks?: number
+    teams?: number
+    surveys?: number
+    questions?: number
+    responses?: number
+    opportunities?: number
+  }
+  message?: string
+}
+
+export function useResetAll() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<ResetResult>('/status/reset/all?confirm=true')
+      return data
+    },
+    onSuccess: () => {
+      // Invalidate all queries
+      queryClient.invalidateQueries()
+    },
+  })
+}
+
+export function useResetOccupation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (occupationId: string) => {
+      const { data } = await apiClient.post<ResetResult>(`/status/reset/occupation/${occupationId}?confirm=true`)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupations'] })
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks'] })
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+    },
+  })
+}
+
+export function useDeleteOccupation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (occupationId: string) => {
+      const { data } = await apiClient.delete<ResetResult>(`/status/reset/occupation/${occupationId}?confirm=true`)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupations'] })
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+    },
+  })
+}
+
+export function useResetTasks() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<ResetResult>('/status/reset/tasks?confirm=true')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['occupationTasks'] })
+      queryClient.invalidateQueries({ queryKey: ['globalTasks'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+    },
+  })
+}
+
+// ============================================================================
+// Sample Data Generation Hooks
+// ============================================================================
+
+export interface SurveysForSampleData {
+  surveys: {
+    id: string
+    name: string
+    team_name: string
+    occupation_name: string
+    status: string
+    question_count: number
+    response_count: number
+    can_generate: boolean
+  }[]
+  personas_available: string[]
+}
+
+export interface SampleDataRequest {
+  survey_id: string
+  count: number
+  mode: 'random' | 'persona'
+}
+
+export interface SampleDataResult {
+  success: boolean
+  message: string
+  survey_id: string
+  survey_name: string
+  responses_created: number
+  mode: string
+  personas_used: string[] | null
+}
+
+export function useSurveysForSampleData() {
+  return useQuery({
+    queryKey: ['status', 'surveys-for-sample-data'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SurveysForSampleData>('/status/surveys')
+      return data
+    },
+  })
+}
+
+export function useGenerateSampleData() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: SampleDataRequest) => {
+      const { data } = await apiClient.post<SampleDataResult>('/status/generate-sample-data', request)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['metrics'] })
     },
   })
 }

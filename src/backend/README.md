@@ -25,10 +25,11 @@ src/backend/
 │   │       └── endpoints/
 │   │           ├── occupations.py  # Occupation management
 │   │           ├── teams.py        # Team CRUD
-│   │           ├── surveys.py      # Survey lifecycle
+│   │           ├── surveys.py      # Survey lifecycle + cloning
 │   │           ├── responses.py    # Anonymous response collection
 │   │           ├── metrics.py      # Core 4 metrics
-│   │           └── opportunities.py # RICE opportunities
+│   │           ├── opportunities.py # RICE opportunities
+│   │           └── status.py       # System status & sample data
 │   ├── core/
 │   │   └── config.py         # Environment-based settings
 │   ├── db/
@@ -42,7 +43,8 @@ src/backend/
 │       ├── faethm_client.py      # Faethm API client (mock/live)
 │       ├── metrics_calculator.py # Core 4 calculations
 │       ├── opportunity_generator.py # RICE scoring
-│       └── survey_generator.py   # Question generation
+│       ├── survey_generator.py   # Static question generation
+│       └── question_generation_service.py # LLM question generation
 ├── tests/                    # Pytest test suite
 ├── pyproject.toml           # Dependencies and config
 ├── .env.example             # Environment template
@@ -204,9 +206,10 @@ uvicorn app.main:app --reload
 | `GET` | `/{id}` | Get survey with questions |
 | `PUT` | `/{id}` | Update survey (DRAFT only) |
 | `DELETE` | `/{id}` | Delete survey (DRAFT only) |
-| `POST` | `/{id}/generate-questions` | Auto-generate questions |
+| `POST` | `/{id}/generate-questions` | Auto-generate questions (LLM or static) |
 | `POST` | `/{id}/activate` | Change status to ACTIVE |
 | `POST` | `/{id}/close` | Change status to CLOSED |
+| `POST` | `/{id}/clone` | Clone survey with all questions |
 | `GET` | `/{id}/link` | Get anonymous response link |
 | `GET` | `/{id}/stats` | Response statistics |
 
@@ -240,15 +243,38 @@ uvicorn app.main:app --reload
 | `POST` | `/surveys/{survey_id}/generate-opportunities` | Auto-generate from survey |
 | `GET` | `/summary` | Summary statistics |
 
+### Status & Admin (`/api/v1/status`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | System status and version info |
+| `GET` | `/version` | Detailed version information |
+| `GET` | `/surveys` | List all surveys for admin purposes |
+| `POST` | `/generate-sample-data` | Generate sample survey responses |
+| `POST` | `/reset/all` | Reset all data (surveys, responses, metrics) |
+| `POST` | `/reset/tasks` | Reset task data for an occupation |
+| `POST` | `/reset/occupation/{id}` | Reset occupation (keeps teams) |
+| `DELETE` | `/occupation/{id}` | Delete occupation and related data |
+| `GET` | `/faethm/tasks/{code}` | Debug: Raw Faethm task data |
+
 ## Core Services
 
 ### Survey Generator (`services/survey_generator.py`)
 
-Generates survey questions from occupation data:
+Generates static survey questions from occupation data:
 - 6 friction dimensions: Clarity, Tooling, Process, Rework, Delay, Safety
 - 3 Flow questions (throughput measurement)
 - 3 Portfolio Balance questions (run vs. change work)
 - Target: 15-18 questions per survey (~7 minutes)
+
+### Question Generation Service (`services/question_generation_service.py`)
+
+LLM-powered question generation for contextual surveys:
+- Uses Claude API for intelligent question generation
+- Generates occupation-specific questions based on tasks
+- Falls back to static generator if LLM unavailable
+- Supports caching to reduce API calls
+- Configurable via `LLM_MOCK` environment variable
 
 ### Metrics Calculator (`services/metrics_calculator.py`)
 

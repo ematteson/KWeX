@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models import Occupation
+from app.models import Occupation, GlobalTask, OccupationTask, TaskCategory
 from app.schemas import OccupationCreate, OccupationResponse
 
 router = APIRouter(prefix="/occupations", tags=["occupations"])
@@ -158,12 +158,16 @@ def sync_occupations_from_faethm(
             # Update existing
             for key, value in occ_data.items():
                 setattr(existing, key, value)
+            db.flush()
+            _sync_tasks_for_occupation(db, client, existing, faethm_code)
             updated += 1
             synced_names.append(f"{faethm_code} (updated)")
         else:
             # Create new
             new_occ = Occupation(**occ_data)
             db.add(new_occ)
+            db.flush()  # Get the ID before syncing tasks
+            _sync_tasks_for_occupation(db, client, new_occ, faethm_code)
             created += 1
             synced_names.append(f"{faethm_code} (created)")
 
@@ -179,7 +183,7 @@ def sync_occupations_from_faethm(
 
 @router.post("/sync-by-code/{faethm_code}", response_model=OccupationResponse)
 def sync_single_occupation(faethm_code: str, db: Session = Depends(get_db)):
-    """Sync a single occupation by its Faethm code."""
+    """Sync a single occupation by its Faethm code, including tasks."""
     from app.services.faethm_client import FaethmClient
 
     client = FaethmClient()
@@ -202,10 +206,142 @@ def sync_single_occupation(faethm_code: str, db: Session = Depends(get_db)):
             setattr(existing, key, value)
         db.commit()
         db.refresh(existing)
-        return existing
+        occupation = existing
     else:
         new_occ = Occupation(**occ_data)
         db.add(new_occ)
         db.commit()
         db.refresh(new_occ)
-        return new_occ
+        occupation = new_occ
+
+    # Sync tasks for this occupation
+    _sync_tasks_for_occupation(db, client, occupation, faethm_code, commit=True)
+
+    return occupation
+
+
+@router.post("/{occupation_id}/sync-tasks")
+def sync_tasks_for_occupation(occupation_id: str, db: Session = Depends(get_db)):
+    """Sync tasks for an existing occupation.
+
+    Use this to add tasks to occupations that were synced before task syncing was implemented.
+    """
+    from app.services.faethm_client import FaethmClient
+
+    occupation = db.query(Occupation).filter(Occupation.id == occupation_id).first()
+    if not occupation:
+        raise HTTPException(status_code=404, detail="Occupation not found")
+
+    if not occupation.faethm_code:
+        raise HTTPException(
+            status_code=400,
+            detail="Occupation has no faethm_code - cannot sync tasks from Faethm"
+        )
+
+    client = FaethmClient()
+    tasks_synced = _sync_tasks_for_occupation(
+        db, client, occupation, occupation.faethm_code, commit=True
+    )
+
+    return {
+        "occupation_id": occupation_id,
+        "occupation_name": occupation.name,
+        "tasks_synced": tasks_synced,
+    }
+
+
+def _sync_tasks_for_occupation(
+    db: Session,
+    client,
+    occupation: Occupation,
+    faethm_code: str,
+    commit: bool = False
+) -> int:
+    """Sync tasks from Faethm and create OccupationTask assignments.
+
+    Returns the number of tasks synced.
+    """
+    # Get tasks from Faethm
+    faethm_tasks = client.get_tasks(faethm_code)
+
+    if not faethm_tasks:
+        return 0
+
+    # Map category strings to enum
+    category_map = {
+        "core": TaskCategory.CORE,
+        "support": TaskCategory.SUPPORT,
+        "admin": TaskCategory.ADMIN,
+    }
+
+    tasks_synced = 0
+    for idx, task_data in enumerate(faethm_tasks):
+        faethm_task_id = task_data.get("faethm_task_id")
+        task_name = task_data.get("name")
+        task_description = task_data.get("description", "")
+        task_category = category_map.get(task_data.get("category", "core"), TaskCategory.CORE)
+        # Get time_percent from Faethm API (percentage of time spent on this task)
+        time_percent = task_data.get("time_percent", 0.0)
+
+        if not task_name:
+            continue
+
+        # Check if GlobalTask already exists (by faethm_task_id)
+        global_task = None
+        if faethm_task_id:
+            global_task = (
+                db.query(GlobalTask)
+                .filter(GlobalTask.faethm_task_id == faethm_task_id)
+                .first()
+            )
+
+        # If not found by ID, try to find by name (for Faethm tasks without ID)
+        if not global_task:
+            global_task = (
+                db.query(GlobalTask)
+                .filter(GlobalTask.name == task_name, GlobalTask.source == "faethm")
+                .first()
+            )
+
+        # Create GlobalTask if it doesn't exist
+        if not global_task:
+            global_task = GlobalTask(
+                faethm_task_id=faethm_task_id,
+                name=task_name,
+                description=task_description,
+                category=task_category,
+                is_custom=False,
+                source="faethm",
+            )
+            db.add(global_task)
+            db.flush()  # Get the ID
+
+        # Check if OccupationTask assignment already exists
+        existing_assignment = (
+            db.query(OccupationTask)
+            .filter(
+                OccupationTask.occupation_id == occupation.id,
+                OccupationTask.global_task_id == global_task.id,
+            )
+            .first()
+        )
+
+        # Create or update OccupationTask assignment
+        if existing_assignment:
+            # Update time_percentage if it was 0 (not yet set by user)
+            if existing_assignment.time_percentage == 0.0 and time_percent > 0:
+                existing_assignment.time_percentage = time_percent
+        else:
+            assignment = OccupationTask(
+                occupation_id=occupation.id,
+                global_task_id=global_task.id,
+                time_percentage=time_percent,  # Use Faethm's time allocation
+                display_order=idx,
+            )
+            db.add(assignment)
+            tasks_synced += 1
+
+    if commit:
+        db.commit()
+
+    return tasks_synced
