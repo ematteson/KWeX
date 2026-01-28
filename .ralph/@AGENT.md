@@ -1,49 +1,235 @@
-# Agent Build Instructions
+# Agent Build Instructions — KWeX
 
-## Project Setup
-```bash
-# Install dependencies (example for Node.js project)
-npm install
+## Project Overview
 
-# Or for Python project
-pip install -r requirements.txt
+KWeX (Knowledge Worker Experience) is a knowledge-work observability system with:
+- **Backend**: Python 3.11+ / FastAPI / SQLAlchemy / SQLite
+- **Frontend**: React 18+ / TypeScript / Tailwind CSS / Vite
 
-# Or for Rust project  
-cargo build
+## Stack Policy & Migration
+- **Frontend standard**: Node.js + TypeScript only.
+- **Prototype backend**: Python + FastAPI for rapid iteration.
+- **MVP hardening**: Migrate backend to Rust after stability gates are met (OpenAPI stable, DB schema frozen, MVP criteria met).
+- **Loop rule**: After the gate, no new Python features; only bug fixes until Rust parity is complete.
+
+## Project Structure
+
+```
+KWeX/
+├── .ralph/                    # Ralph configuration
+│   ├── @AGENT.md             # This file - build instructions
+│   ├── @fix_plan.md          # Task list
+│   ├── PROMPT.md             # Development instructions
+│   └── specs/                # Technical specifications
+├── src/
+│   ├── backend/              # FastAPI backend
+│   │   ├── app/
+│   │   │   ├── api/v1/       # API endpoints
+│   │   │   ├── core/         # Configuration
+│   │   │   ├── db/           # Database setup
+│   │   │   ├── models/       # SQLAlchemy models
+│   │   │   ├── schemas/      # Pydantic schemas
+│   │   │   └── services/     # Business logic
+│   │   ├── tests/            # Backend tests
+│   │   └── pyproject.toml    # Python dependencies
+│   └── frontend/             # React frontend
+│       ├── src/
+│       │   ├── api/          # API client and hooks
+│       │   ├── components/   # Reusable UI components
+│       │   └── pages/        # Page components
+│       ├── package.json      # npm dependencies
+│       └── vite.config.ts    # Vite configuration
+└── docker/                   # Docker configuration (TBD)
 ```
 
-## Running Tests
+## Backend Setup
+
 ```bash
-# Node.js
-npm test
+# Navigate to backend directory
+cd src/backend
 
-# Python
-pytest
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Rust
-cargo test
+# Install dependencies
+pip install -e ".[dev]"
+
+# Copy environment file
+cp .env.example .env
+
+# Initialize database (happens automatically on startup)
 ```
 
-## Build Commands
+## Running the Backend
+
 ```bash
-# Production build
-npm run build
-# or
-cargo build --release
+# Development server with auto-reload
+cd src/backend
+uvicorn app.main:app --reload --port 8000
+
+# Or run directly
+python -m uvicorn app.main:app --reload
 ```
 
-## Development Server
+## Rust Backend (Post-MVP)
+
 ```bash
-# Start development server
-npm run dev
-# or
+cd src/backend-rust
 cargo run
 ```
 
+The Rust service should preserve the same OpenAPI contract as the Python MVP.
+
+The API will be available at:
+- API: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## Frontend Setup
+
+```bash
+# Navigate to frontend directory
+cd src/frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The frontend will be available at http://localhost:3000
+
+## Running Tests
+
+### Backend Tests
+```bash
+# From src/backend directory
+cd src/backend
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app tests/ --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_api_basic.py -v
+```
+
+### Frontend Tests
+```bash
+# From src/frontend directory
+cd src/frontend
+
+# Run tests
+npm test
+
+# Run tests with UI
+npm run test:ui
+```
+
+## API Endpoints (Implemented)
+
+### Health & Info
+- `GET /` - API info
+- `GET /health` - Health check
+
+### Occupations
+- `GET /api/v1/occupations` - List occupations
+- `POST /api/v1/occupations` - Create occupation
+- `GET /api/v1/occupations/{id}` - Get occupation
+- `POST /api/v1/occupations/sync` - Sync from Faethm
+
+### Teams
+- `GET /api/v1/teams` - List teams
+- `POST /api/v1/teams` - Create team
+- `GET /api/v1/teams/{id}` - Get team
+- `PUT /api/v1/teams/{id}` - Update team
+
+### Surveys
+- `GET /api/v1/surveys` - List surveys
+- `POST /api/v1/surveys` - Create survey
+- `GET /api/v1/surveys/{id}` - Get survey
+- `PUT /api/v1/surveys/{id}` - Update survey (draft only)
+- `DELETE /api/v1/surveys/{id}` - Delete survey (draft only)
+- `POST /api/v1/surveys/{id}/activate` - Activate survey
+- `POST /api/v1/surveys/{id}/close` - Close survey
+- `GET /api/v1/surveys/{id}/link` - Generate response link
+- `GET /api/v1/surveys/{id}/stats` - Get response stats
+- `POST /api/v1/surveys/{id}/generate-questions` - Generate questions from occupation
+
+### Survey Responses (Anonymous)
+- `POST /api/v1/responses` - Start a new response
+- `GET /api/v1/responses/token/{token}` - Get survey by token
+- `POST /api/v1/responses/{id}/submit` - Submit answers
+
+### Metrics
+- `GET /api/v1/teams/{id}/metrics` - Get current team metrics
+- `GET /api/v1/teams/{id}/metrics/history` - Get metrics history
+- `GET /api/v1/teams/{id}/metrics/{survey_id}` - Get metrics for specific survey
+- `POST /api/v1/teams/{id}/metrics/calculate` - Trigger metrics calculation
+
+### Opportunities
+- `GET /api/v1/teams/{id}/opportunities` - List opportunities (RICE sorted)
+- `GET /api/v1/teams/{id}/opportunities/{opp_id}` - Get opportunity
+- `POST /api/v1/teams/{id}/opportunities` - Create opportunity manually
+- `PATCH /api/v1/teams/{id}/opportunities/{opp_id}` - Update opportunity
+- `DELETE /api/v1/teams/{id}/opportunities/{opp_id}` - Delete opportunity
+- `POST /api/v1/teams/{id}/surveys/{survey_id}/generate-opportunities` - Generate opportunities from survey
+- `GET /api/v1/teams/{id}/opportunities/summary` - Get summary statistics
+
+## Frontend Pages
+
+- `/teams` - Team list
+- `/teams/:teamId` - Team dashboard with Core 4 metrics
+- `/teams/:teamId/opportunities` - Opportunities list
+- `/survey/:token` - Survey taking interface
+- `/survey/complete` - Survey completion confirmation
+
+## Key Services
+
+### MetricsCalculator (`app/services/metrics_calculator.py`)
+- Calculates Core 4 Metrics (Flow, Friction, Safety, Portfolio Balance)
+- Enforces 7-respondent privacy threshold
+- Tracks trend direction (UP/DOWN/STABLE)
+
+### OpportunityGenerator (`app/services/opportunity_generator.py`)
+- Converts friction signals to improvement opportunities
+- Calculates RICE scores: (Reach × Impact × Confidence) / Effort
+- Manages opportunity status workflow
+
+### SurveyGenerator (`app/services/survey_generator.py`)
+- Generates questions from 6 friction dimension templates
+- Maps questions to metrics
+
+### FaethmClient (`app/services/faethm_client.py`)
+- Mock mode with 5 pilot occupations
+- Ready for real API integration
+
 ## Key Learnings
-- Update this section when you learn new build optimizations
-- Document any gotchas or special setup requirements
-- Keep track of the fastest test/build cycle
+
+### Database
+- SQLite for MVP, easy migration path to PostgreSQL
+- SQLAlchemy 2.0 with declarative mapping
+- Automatic table creation on startup via `init_db()`
+
+### Testing
+- Use in-memory SQLite for fast tests
+- TestClient from FastAPI for integration tests
+- pytest fixtures for database session management
+
+### Faethm Integration
+- Mock mode enabled by default (`FAETHM_API_MOCK=true`)
+- Mock data covers 5 MVP occupations with tasks
+- Real API integration ready when credentials available
+
+### Frontend
+- Vite for fast development builds
+- React Query for API state management
+- Tailwind CSS with Pearson brand colors
+- Anonymous survey tokens for privacy
 
 ## Feature Development Quality Standards
 
@@ -55,17 +241,11 @@ cargo run
 - **Test Pass Rate**: 100% - all tests must pass, no exceptions
 - **Test Types Required**:
   - Unit tests for all business logic and services
-  - Integration tests for API endpoints or main functionality
-  - End-to-end tests for critical user workflows
+  - Integration tests for API endpoints
 - **Coverage Validation**: Run coverage reports before marking features complete:
   ```bash
-  # Examples by language/framework
-  npm run test:coverage
-  pytest --cov=src tests/ --cov-report=term-missing
-  cargo tarpaulin --out Html
+  pytest --cov=app tests/ --cov-report=term-missing
   ```
-- **Test Quality**: Tests must validate behavior, not just achieve coverage metrics
-- **Test Documentation**: Complex test scenarios must include comments explaining the test strategy
 
 ### Git Workflow Requirements
 
@@ -76,83 +256,19 @@ Before moving to the next feature, ALL changes must be:
    git add .
    git commit -m "feat(module): descriptive message following conventional commits"
    ```
-   - Use conventional commit format: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, etc.
-   - Include scope when applicable: `feat(api):`, `fix(ui):`, `test(auth):`
-   - Write descriptive messages that explain WHAT changed and WHY
 
-2. **Pushed to Remote Repository**:
-   ```bash
-   git push origin <branch-name>
-   ```
-   - Never leave completed features uncommitted
-   - Push regularly to maintain backup and enable collaboration
-   - Ensure CI/CD pipelines pass before considering feature complete
+2. **Pushed to Remote Repository** (when remote is configured)
 
-3. **Branch Hygiene**:
-   - Work on feature branches, never directly on `main`
-   - Branch naming convention: `feature/<feature-name>`, `fix/<issue-name>`, `docs/<doc-update>`
-   - Create pull requests for all significant changes
-
-4. **Ralph Integration**:
+3. **Ralph Integration**:
    - Update .ralph/@fix_plan.md with new tasks before starting work
    - Mark items complete in .ralph/@fix_plan.md upon completion
-   - Update .ralph/PROMPT.md if development patterns change
-   - Test features work within Ralph's autonomous loop
-
-### Documentation Requirements
-
-**ALL implementation documentation MUST remain synchronized with the codebase**:
-
-1. **Code Documentation**:
-   - Language-appropriate documentation (JSDoc, docstrings, etc.)
-   - Update inline comments when implementation changes
-   - Remove outdated comments immediately
-
-2. **Implementation Documentation**:
-   - Update relevant sections in this AGENT.md file
-   - Keep build and test commands current
-   - Update configuration examples when defaults change
-   - Document breaking changes prominently
-
-3. **README Updates**:
-   - Keep feature lists current
-   - Update setup instructions when dependencies change
-   - Maintain accurate command examples
-   - Update version compatibility information
-
-4. **AGENT.md Maintenance**:
-   - Add new build patterns to relevant sections
-   - Update "Key Learnings" with new insights
-   - Keep command examples accurate and tested
-   - Document new testing patterns or quality gates
 
 ### Feature Completion Checklist
 
 Before marking ANY feature as complete, verify:
 
-- [ ] All tests pass with appropriate framework command
+- [ ] All tests pass: `pytest`
 - [ ] Code coverage meets 85% minimum threshold
-- [ ] Coverage report reviewed for meaningful test quality
-- [ ] Code formatted according to project standards
-- [ ] Type checking passes (if applicable)
 - [ ] All changes committed with conventional commit messages
-- [ ] All commits pushed to remote repository
 - [ ] .ralph/@fix_plan.md task marked as complete
-- [ ] Implementation documentation updated
-- [ ] Inline code comments updated or added
 - [ ] .ralph/@AGENT.md updated (if new patterns introduced)
-- [ ] Breaking changes documented
-- [ ] Features tested within Ralph loop (if applicable)
-- [ ] CI/CD pipeline passes
-
-### Rationale
-
-These standards ensure:
-- **Quality**: High test coverage and pass rates prevent regressions
-- **Traceability**: Git commits and .ralph/@fix_plan.md provide clear history of changes
-- **Maintainability**: Current documentation reduces onboarding time and prevents knowledge loss
-- **Collaboration**: Pushed changes enable team visibility and code review
-- **Reliability**: Consistent quality gates maintain production stability
-- **Automation**: Ralph integration ensures continuous development practices
-
-**Enforcement**: AI agents should automatically apply these standards to all feature development tasks without requiring explicit instruction for each task.

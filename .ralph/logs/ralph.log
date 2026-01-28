@@ -131,3 +131,228 @@
 [2026-01-22 20:09:22] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
 [2026-01-22 20:09:22] [INFO] Starting new Claude session
 [2026-01-22 20:09:22] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:24:30] [SUCCESS] 🚀 Ralph loop starting with Claude Code
+[2026-01-22 20:24:30] [INFO] Max calls per hour: 100
+[2026-01-22 20:24:30] [INFO] Logs: .ralph/logs/ | Docs: .ralph/docs/generated/ | Status: .ralph/status.json
+[2026-01-22 20:24:30] [INFO] Starting main loop...
+[2026-01-22 20:24:30] [INFO] DEBUG: About to enter while loop, loop_count=0
+[2026-01-22 20:24:31] [INFO] DEBUG: Successfully incremented loop_count to 1
+[2026-01-22 20:24:31] [INFO] Loop #1 - calling init_call_tracking...
+[2026-01-22 20:24:31] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:24:31] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:24:31] [LOOP] === Starting Loop #1 ===
+[2026-01-22 20:24:31] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:24:31] [INFO] DEBUG: Exit signals content: {"test_only_loops": [], "done_signals": [], "completion_indicators": []}
+[2026-01-22 20:24:31] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:0
+[2026-01-22 20:24:31] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:46, completed_items:3
+[2026-01-22 20:24:31] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 20:24:31] [LOOP] Executing Claude Code (Call 1/100)
+[2026-01-22 20:24:31] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 20:24:31] [INFO] Starting new Claude session
+[2026-01-22 20:24:31] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:32:04] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 20:32:04] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 20:32:04] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 20:32:10] [LOOP] === Completed Loop #1 ===
+[2026-01-22 20:32:10] [INFO] DEBUG: Successfully incremented loop_count to 2
+[2026-01-22 20:32:10] [INFO] Loop #2 - calling init_call_tracking...
+[2026-01-22 20:32:10] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:32:10] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:32:10] [LOOP] === Starting Loop #2 ===
+[2026-01-22 20:32:10] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:32:10] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1
+  ]
+}
+[2026-01-22 20:32:10] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:1
+[2026-01-22 20:32:10] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:52, completed_items:15
+[2026-01-22 20:32:10] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 20:32:11] [LOOP] Executing Claude Code (Call 2/100)
+[2026-01-22 20:32:11] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 20:32:11] [INFO] Resuming Claude session: 1ae9c80e-456e-4776-9... (0h old)
+[2026-01-22 20:32:11] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:36:12] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 20:36:12] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 20:36:12] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 20:36:19] [LOOP] === Completed Loop #2 ===
+[2026-01-22 20:36:19] [INFO] DEBUG: Successfully incremented loop_count to 3
+[2026-01-22 20:36:19] [INFO] Loop #3 - calling init_call_tracking...
+[2026-01-22 20:36:19] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:36:19] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:36:19] [LOOP] === Starting Loop #3 ===
+[2026-01-22 20:36:19] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:36:19] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1,
+    2
+  ]
+}
+[2026-01-22 20:36:19] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:2
+[2026-01-22 20:36:19] [INFO] DEBUG: Completion indicators (2) present but EXIT_SIGNAL=false, continuing...
+[2026-01-22 20:36:19] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:56, completed_items:22
+[2026-01-22 20:36:19] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 20:36:19] [LOOP] Executing Claude Code (Call 3/100)
+[2026-01-22 20:36:19] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 20:36:20] [INFO] Resuming Claude session: 1ae9c80e-456e-4776-9... (0h old)
+[2026-01-22 20:36:20] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:40:01] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 20:40:01] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 20:40:01] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 20:40:08] [LOOP] === Completed Loop #3 ===
+[2026-01-22 20:40:08] [INFO] DEBUG: Successfully incremented loop_count to 4
+[2026-01-22 20:40:08] [INFO] Loop #4 - calling init_call_tracking...
+[2026-01-22 20:40:08] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:40:08] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:40:08] [LOOP] === Starting Loop #4 ===
+[2026-01-22 20:40:08] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:40:08] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1,
+    2,
+    3
+  ]
+}
+[2026-01-22 20:40:08] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:3
+[2026-01-22 20:40:08] [INFO] DEBUG: Completion indicators (3) present but EXIT_SIGNAL=false, continuing...
+[2026-01-22 20:40:08] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:61, completed_items:33
+[2026-01-22 20:40:08] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 20:40:09] [LOOP] Executing Claude Code (Call 4/100)
+[2026-01-22 20:40:09] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 20:40:09] [INFO] Resuming Claude session: 1ae9c80e-456e-4776-9... (0h old)
+[2026-01-22 20:40:09] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:49:23] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 20:49:23] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 20:49:23] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 20:49:29] [LOOP] === Completed Loop #4 ===
+[2026-01-22 20:49:29] [INFO] DEBUG: Successfully incremented loop_count to 5
+[2026-01-22 20:49:30] [INFO] Loop #5 - calling init_call_tracking...
+[2026-01-22 20:49:30] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:49:30] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:49:30] [LOOP] === Starting Loop #5 ===
+[2026-01-22 20:49:30] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:49:30] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1,
+    2,
+    3,
+    4
+  ]
+}
+[2026-01-22 20:49:30] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:4
+[2026-01-22 20:49:30] [INFO] DEBUG: Completion indicators (4) present but EXIT_SIGNAL=false, continuing...
+[2026-01-22 20:49:30] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:66, completed_items:42
+[2026-01-22 20:49:30] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 20:49:30] [LOOP] Executing Claude Code (Call 5/100)
+[2026-01-22 20:49:30] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 20:49:30] [INFO] Resuming Claude session: 1ae9c80e-456e-4776-9... (0h old)
+[2026-01-22 20:49:30] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 20:57:24] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 20:57:24] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 20:57:24] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 20:57:30] [LOOP] === Completed Loop #5 ===
+[2026-01-22 20:57:30] [INFO] DEBUG: Successfully incremented loop_count to 6
+[2026-01-22 20:57:30] [INFO] Loop #6 - calling init_call_tracking...
+[2026-01-22 20:57:30] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 20:57:30] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 20:57:30] [LOOP] === Starting Loop #6 ===
+[2026-01-22 20:57:30] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 20:57:30] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
+}
+[2026-01-22 20:57:30] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:5
+[2026-01-22 20:57:30] [WARN] 🚨 SAFETY CIRCUIT BREAKER: Force exit after 5 consecutive completion indicators (5)
+[2026-01-22 20:57:30] [SUCCESS] 🏁 Graceful exit triggered: safety_circuit_breaker
+[2026-01-22 20:57:30] [INFO] Session reset: project_complete
+[2026-01-22 20:57:30] [SUCCESS] 🎉 Ralph has completed the project! Final stats:
+[2026-01-22 20:57:30] [INFO]   - Total loops: 6
+[2026-01-22 20:57:30] [INFO]   - API calls used: 5
+[2026-01-22 20:57:30] [INFO]   - Exit reason: safety_circuit_breaker
+[2026-01-22 21:04:31] [SUCCESS] 🚀 Ralph loop starting with Claude Code
+[2026-01-22 21:04:31] [INFO] Max calls per hour: 100
+[2026-01-22 21:04:32] [INFO] Logs: .ralph/logs/ | Docs: .ralph/docs/generated/ | Status: .ralph/status.json
+[2026-01-22 21:04:32] [INFO] Starting main loop...
+[2026-01-22 21:04:32] [INFO] DEBUG: About to enter while loop, loop_count=0
+[2026-01-22 21:04:32] [INFO] DEBUG: Successfully incremented loop_count to 1
+[2026-01-22 21:04:32] [INFO] Loop #1 - calling init_call_tracking...
+[2026-01-22 21:04:32] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 21:04:32] [INFO] Call counter reset for new hour: 2026012221
+[2026-01-22 21:04:32] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 21:04:32] [LOOP] === Starting Loop #1 ===
+[2026-01-22 21:04:32] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 21:04:32] [INFO] DEBUG: Exit signals content: {"test_only_loops": [], "done_signals": [], "completion_indicators": []}
+[2026-01-22 21:04:32] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:0
+[2026-01-22 21:04:32] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:73, completed_items:54
+[2026-01-22 21:04:32] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 21:04:32] [LOOP] Executing Claude Code (Call 1/100)
+[2026-01-22 21:04:32] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 21:04:32] [INFO] Starting new Claude session
+[2026-01-22 21:04:32] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 21:13:56] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 21:13:56] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 21:13:56] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 21:14:02] [LOOP] === Completed Loop #1 ===
+[2026-01-22 21:14:02] [INFO] DEBUG: Successfully incremented loop_count to 2
+[2026-01-22 21:14:02] [INFO] Loop #2 - calling init_call_tracking...
+[2026-01-22 21:14:02] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 21:14:02] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 21:14:02] [LOOP] === Starting Loop #2 ===
+[2026-01-22 21:14:02] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 21:14:02] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [],
+  "completion_indicators": [
+    1
+  ]
+}
+[2026-01-22 21:14:02] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:0, completion:1
+[2026-01-22 21:14:02] [INFO] DEBUG: .ralph/@fix_plan.md check - total_items:79, completed_items:63
+[2026-01-22 21:14:02] [INFO] DEBUG: No exit conditions met, continuing loop
+[2026-01-22 21:14:02] [LOOP] Executing Claude Code (Call 2/100)
+[2026-01-22 21:14:02] [INFO] ⏳ Starting Claude Code execution... (timeout: 15m)
+[2026-01-22 21:14:02] [INFO] Resuming Claude session: 1ae9c80e-456e-4776-9... (0h old)
+[2026-01-22 21:14:02] [INFO] Using modern CLI mode (JSON output)
+[2026-01-22 21:19:25] [SUCCESS] ✅ Claude Code execution completed successfully
+[2026-01-22 21:19:25] [INFO] Saved Claude session: 1ae9c80e-456e-4776-9...
+[2026-01-22 21:19:25] [INFO] 🔍 Analyzing Claude Code response...
+[2026-01-22 21:19:31] [LOOP] === Completed Loop #2 ===
+[2026-01-22 21:19:31] [INFO] DEBUG: Successfully incremented loop_count to 3
+[2026-01-22 21:19:31] [INFO] Loop #3 - calling init_call_tracking...
+[2026-01-22 21:19:31] [INFO] DEBUG: Entered init_call_tracking...
+[2026-01-22 21:19:31] [INFO] DEBUG: Completed init_call_tracking successfully
+[2026-01-22 21:19:31] [LOOP] === Starting Loop #3 ===
+[2026-01-22 21:19:31] [INFO] DEBUG: Checking exit conditions...
+[2026-01-22 21:19:31] [INFO] DEBUG: Exit signals content: {
+  "test_only_loops": [],
+  "done_signals": [
+    2
+  ],
+  "completion_indicators": [
+    1,
+    2
+  ]
+}
+[2026-01-22 21:19:31] [INFO] DEBUG: Exit counts - test_loops:0, done_signals:1, completion:2
+[2026-01-22 21:19:31] [WARN] Exit condition: Strong completion indicators (2) with EXIT_SIGNAL=true
+[2026-01-22 21:19:31] [SUCCESS] 🏁 Graceful exit triggered: project_complete
+[2026-01-22 21:19:32] [INFO] Session reset: project_complete
+[2026-01-22 21:19:32] [SUCCESS] 🎉 Ralph has completed the project! Final stats:
+[2026-01-22 21:19:32] [INFO]   - Total loops: 3
+[2026-01-22 21:19:32] [INFO]   - API calls used: 2
+[2026-01-22 21:19:32] [INFO]   - Exit reason: project_complete

@@ -1,0 +1,98 @@
+﻿name,function,occupation_code,member_code
+Account Based Marketing,Account Based Marketing,MKD.MGR,81
+Administrative Support,Administrative Support,ADM.GOC,205
+Agile Business Analyst,Agile Business Analyst,OPS.BUS,54
+AI Scientist,AI Scientist,SCI.ML,28
+Application Security,Application Security,ICT.CYB,130
+Automated Scorer,Automated Scorer,ICT.TAU,11
+Benefits,Benefits,HR.CMP,36
+Bid Management,Bid Management,OPS.MPPD,34
+BPO Management,BPO Management,OPS.MGR,65
+Brand,Brand,MKD.MBRD,17
+Business Analytics,Business Analytics,ICT.BI,241
+Business Architecture,Business Architecture,OPS.MDEV,6
+Business Partner,Business Partner,FIN.BPR,84
+Chief Business Officer,Chief Business Officer,E.CEO,6
+Chief Executive Support,Chief Executive Support,ADM.EXS,5
+Chief Financial Officer,Chief Financial Officer,E.FIN,1
+Chief Human Resources Officer,Chief Human Resources Officer,E.HR,1
+Chief Legal Officer,Chief Legal Officer,E.OPS,2
+Chief Marketing Officer,Chief Marketing Officer,E.MRK,1
+Chief Technology Officer,Chief Technology Officer,E.TCH,1
+Client Partner,Client Partner,SAL.ACM,370
+Cloud Engineer,Cloud Engineer,ICT.CCT,85
+Company Secretary,Company Secretary,ADM.CSC,7
+Compliance & Operations,Compliance & Operations,OPS.CMP,89
+Compliance Counsel,Compliance Counsel,LEG.CNS,0
+Content Developer,Content Developer,MKD.CNP,825
+Content Quality Assurance,Content Quality Assurance,ICT.TST,54
+Contracts Management,Contracts Management,OPS.CNS,12
+Copy Editor,Copy Editor,AEM.CWR,13
+Corporate Communications,Corporate Communications,MKD.COM,33
+Corporate Security & Safety,Corporate Security & Safety,OPS.SEC,5
+Creative Services,Creative Services,MKD.GRD,71
+Customer Service,Customer Service,OPS.CSR,855
+Customer Success,Customer Success,OPS.CXP,464
+Data Engineering,Data Engineering,ICT.DE,74
+Data Governance & Compliance,Data Governance & Compliance,ICT.GOV,66
+Data Scientist,Data Scientist,ICT.DSC,26
+DevOps & SRE,DevOps & SRE,ICT.ASD,116
+Digital and Performance,Digital and Performance,MKD.DMA,41
+Ecommerce,Ecommerce,OPS.OLM,59
+Editorial Developer,Editorial Developer,MKD.CNS,216
+Education Specialist,Education Specialist,EDU.IDT,300
+Employee Relations,Employee Relations,OPS.LR,4
+Employment Counsel,Employment Counsel,LEG.EHS,0
+Enrollment Advisor,Enrollment Advisor,SOC.SVC,107
+Enterprise Architect,Enterprise Architect,ICT.EA,10
+"Environmental, Social, and Governance","Environmental, Social, and Governance",OPS.SUS,7
+"Events, Sponsorship and Associations","Events, Sponsorship and Associations",OPS.MCE,22
+Financial Control,Financial Control,FIN.ANL,96
+Financial Operations,Financial Operations,FIN.FIA,378
+Generalist,Generalist,HR.SPC,109
+Government Relations,Government Relations,MKD.MPUB,45
+HR Business Partner,HR Business Partner,HR.BPR,35
+Human Scorer,Human Scorer,EDU.TEA,51
+Implementation Specialist,Implementation Specialist,OPS.TRD,224
+Infrastructure and Network Operations,Infrastructure and Network Operations,ICT.INF,66
+Inside Sales,Inside Sales,SAL.WHM,1543
+Investor Relations,Investor Relations,FIN.INB,4
+Litigation Counsel,Litigation Counsel,LEG.MGR,0
+Machine Technician & Systems Engineer,Machine Technician & Systems Engineer,MRP.MGR,8
+Measurement Specialist & Analyst,Measurement Specialist & Analyst,ICT.REP,55
+Mergers and Acquisition,Mergers and Acquisition,FIN.MAC,16
+Outside Sales,Outside Sales,SAL.MGR,16
+Paralegal,Paralegal,LEG.PAR,10
+Payroll,Payroll,ADM.PAY,51
+People Support,People Support,ADM.HRA,71
+Portfolio Management,Portfolio Management,OPS.MPRG,241
+"Print, Fulfillment & Warehouse","Print, Fulfillment & Warehouse",ADM.PPE,69
+Process Engineers,Process Engineers,ENG.PRO,9
+Procurement,Procurement,FIN.BUY,27
+Product Management,Product Management,OPS.MPRD,338
+Product Marketing,Product Marketing,MKD.MRS,97
+Production Planning & System Configuration,Production Planning & System Configuration,OPS.CSD,915
+Professional Services,Professional Services,OPS.MNG,31
+Program Manager,Program Manager,OPS.PRJ,97
+Project Manager,Project Manager,OPS.PRM,381
+Property Portfolio Management,Property Portfolio Management,CNS.PRP,14
+Psychometrician & Researcher,Psychometrician & Researcher,MED.CLP,108
+Quality Assurance,Quality Assurance,SCI.QCA,178
+Quality Assurance Engineer,Quality Assurance Engineer,ICT.SQA,397
+Recruiter,Recruiter,HR.REC,74
+Researcher,Researcher,SCI.SRR,52
+Rights and Permissions,Rights and Permissions,ADM.LGP,85
+Sales Excellence,Sales Excellence,SAL.SLP,54
+Sales Incentives,Sales Incentives,SAL.FNS,10
+Service Delivery Management,Service Delivery Management,OPS.MCSD,118
+Social Media,Social Media,MKD.SMC,8
+Software Engineer,Software Engineer,ICT.SSD,1239
+Solution Architect,Solution Architect,ICT.SLA,122
+Strategy,Strategy,OPS.SGY,39
+Tax,Tax,FIN.CTC,25
+Technical Architect,Technical Architect,ICT.CSA,44
+Technology Support,Technology Support,ICT.CUS,93
+Test Publishing,Test Publishing,ADM.PUB,47
+Transportation Planning & Material Processor,Transportation Planning & Material Processor,OPS.MLOG,16
+Treasury,Treasury,FIN.TRS,6
+UX Designer,UX Designer,MKD.UXD,100
