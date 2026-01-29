@@ -7,14 +7,14 @@ interface FrictionHeatmapProps {
   isLoading?: boolean
 }
 
-function getScoreColor(score: number): string {
+function getScoreColor(score: number): { bg: string; text: string } {
   // For friction, lower is BETTER (less friction)
   // So we invert: high score = red (bad), low score = green (good)
-  if (score >= 75) return 'bg-red-500'      // High friction - bad
-  if (score >= 60) return 'bg-orange-400'   // Medium-high friction
-  if (score >= 40) return 'bg-yellow-400'   // Medium friction
-  if (score >= 25) return 'bg-lime-400'     // Low-medium friction
-  return 'bg-green-500'                      // Low friction - good
+  if (score >= 75) return { bg: 'bg-red-500', text: 'text-white' }         // High friction - bad
+  if (score >= 60) return { bg: 'bg-orange-500', text: 'text-white' }      // Medium-high friction
+  if (score >= 40) return { bg: 'bg-amber-400', text: 'text-amber-900' }   // Medium friction
+  if (score >= 25) return { bg: 'bg-lime-400', text: 'text-lime-900' }     // Low-medium friction
+  return { bg: 'bg-green-500', text: 'text-white' }                         // Low friction - good
 }
 
 function getScoreLabel(score: number): string {
@@ -65,22 +65,25 @@ export function FrictionHeatmap({ dimensions, overallScore, isLoading }: Frictio
 
       {/* Heatmap grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {dimensions.map((dim) => (
-          <div
-            key={dim.dimension}
-            className={clsx(
-              'relative rounded-lg p-4 transition-all hover:scale-105 cursor-default',
-              getScoreColor(dim.score)
-            )}
-            title={dim.description}
-          >
-            <div className="text-white">
-              <div className="text-2xl font-bold">{Math.round(dim.score)}</div>
-              <div className="text-sm font-medium opacity-90">{dim.label}</div>
-              <div className="text-xs opacity-75 mt-1">{getScoreLabel(dim.score)}</div>
+        {dimensions.map((dim) => {
+          const colors = getScoreColor(dim.score)
+          return (
+            <div
+              key={dim.dimension}
+              className={clsx(
+                'relative rounded-lg p-4 transition-all hover:scale-105 cursor-default',
+                colors.bg
+              )}
+              title={dim.description}
+            >
+              <div className={colors.text}>
+                <div className="text-2xl font-bold">{Math.round(dim.score)}</div>
+                <div className="text-sm font-medium opacity-90">{dim.label}</div>
+                <div className="text-xs opacity-75 mt-1">{getScoreLabel(dim.score)}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Legend */}
@@ -99,10 +102,20 @@ export function FrictionHeatmap({ dimensions, overallScore, isLoading }: Frictio
         </div>
       </div>
 
-      {/* Dimension details on hover */}
-      <div className="mt-4 text-xs text-pearson-gray-500 text-center">
-        Hover over a dimension to see its description
-      </div>
+      {/* Dimension descriptions */}
+      <details className="mt-4 text-sm">
+        <summary className="cursor-pointer text-pearson-gray-500 hover:text-pearson-gray-700">
+          View dimension descriptions
+        </summary>
+        <div className="mt-2 space-y-2 text-xs text-pearson-gray-600">
+          {dimensions.map((dim) => (
+            <div key={dim.dimension} className="flex gap-2">
+              <span className="font-medium w-20 shrink-0">{dim.label}:</span>
+              <span>{dim.description}</span>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   )
 }

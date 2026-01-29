@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Survey, Question } from '../api/types'
 
 interface SurveyPreviewModalProps {
@@ -86,6 +86,18 @@ function QuestionPreview({ question, index }: { question: Question; index: numbe
 export function SurveyPreviewModal({ survey, isOpen, onClose }: SurveyPreviewModalProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle')
 
+  // Handle escape key to close modal
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose()
+  }, [onClose])
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen, handleEscape])
+
   if (!isOpen) return null
 
   const sortedQuestions = [...(survey.questions || [])].sort((a, b) => a.order - b.order)
@@ -134,8 +146,14 @@ export function SurveyPreviewModal({ survey, isOpen, onClose }: SurveyPreviewMod
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-50 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-50 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-white p-6 border-b flex justify-between items-start">
           <div>

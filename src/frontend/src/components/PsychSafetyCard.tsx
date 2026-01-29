@@ -4,6 +4,7 @@ import {
   useCreatePsychSafetySurvey,
   usePsychSafetyResults,
   useActivateSurvey,
+  useCloseSurvey,
   useGenerateSurveyLink,
   useSurveyStats,
 } from '../api/hooks'
@@ -13,6 +14,17 @@ interface PsychSafetyCardProps {
   teamId: string
 }
 
+// Shortened labels for Edmondson's 7 items
+const PSYCH_SAFETY_ITEM_LABELS: Record<number, string> = {
+  1: 'Safe to take risks',
+  2: 'OK to raise problems',
+  3: 'Accepting differences',
+  4: 'Safe to be vulnerable',
+  5: 'Easy to ask for help',
+  6: 'No undermining',
+  7: 'Skills are valued',
+}
+
 function ScoreGauge({ score, label }: { score: number; label: string }) {
   // Score is on 1-7 scale
   const percentage = ((score - 1) / 6) * 100
@@ -20,7 +32,7 @@ function ScoreGauge({ score, label }: { score: number; label: string }) {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-pearson-gray-600 w-28 truncate" title={label}>{label}</span>
+      <span className="text-xs text-pearson-gray-600 w-32 truncate" title={label}>{label}</span>
       <div className="flex-1 h-2 bg-pearson-gray-200 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} transition-all duration-500`}
@@ -96,7 +108,7 @@ function PsychSafetyResults({ survey }: { survey: Survey }) {
             <ScoreGauge
               key={item.item_number}
               score={item.score}
-              label={`Q${item.item_number}`}
+              label={PSYCH_SAFETY_ITEM_LABELS[item.item_number] || `Item ${item.item_number}`}
             />
           ))}
         </div>
@@ -105,10 +117,11 @@ function PsychSafetyResults({ survey }: { survey: Survey }) {
   )
 }
 
-function ActiveSurveyCard({ survey }: { survey: Survey }) {
+function ActiveSurveyCard({ survey, onClose }: { survey: Survey; onClose: (id: string) => void }) {
   const { data: stats } = useSurveyStats(survey.id)
   const generateLink = useGenerateSurveyLink()
   const [surveyUrl, setSurveyUrl] = useState<string | null>(null)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
 
   const handleGetLink = async () => {
     const result = await generateLink.mutateAsync(survey.id)
@@ -116,9 +129,13 @@ function ActiveSurveyCard({ survey }: { survey: Survey }) {
     setSurveyUrl(fullUrl)
   }
 
+  const [copied, setCopied] = useState(false)
+
   const handleCopyLink = () => {
     if (surveyUrl) {
       navigator.clipboard.writeText(surveyUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -126,7 +143,18 @@ function ActiveSurveyCard({ survey }: { survey: Survey }) {
     <div className="border border-pearson-blue/30 bg-pearson-blue/5 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-medium text-pearson-gray-800">{survey.name}</h4>
-        <span className="text-xs px-2 py-1 bg-pearson-blue text-white rounded-full">Active</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2 py-1 bg-pearson-blue text-white rounded-full">Active</span>
+          <button
+            onClick={() => setShowCloseConfirm(true)}
+            className="text-xs text-pearson-gray-500 hover:text-pearson-gray-700"
+            title="Close survey"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="text-sm text-pearson-gray-600 mb-3">
@@ -156,10 +184,40 @@ function ActiveSurveyCard({ survey }: { survey: Survey }) {
           />
           <button
             onClick={handleCopyLink}
-            className="text-xs px-3 py-2 bg-pearson-blue text-white rounded hover:bg-pearson-blue/90"
+            className={`text-xs px-3 py-2 rounded transition-colors ${
+              copied
+                ? 'bg-green-600 text-white'
+                : 'bg-pearson-blue text-white hover:bg-pearson-blue/90'
+            }`}
           >
-            Copy
+            {copied ? 'Copied!' : 'Copy'}
           </button>
+        </div>
+      )}
+
+      {/* Close confirmation dialog */}
+      {showCloseConfirm && (
+        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800 mb-2">
+            Close this assessment? Results will be calculated with current responses.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                onClose(survey.id)
+                setShowCloseConfirm(false)
+              }}
+              className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700"
+            >
+              Close Assessment
+            </button>
+            <button
+              onClick={() => setShowCloseConfirm(false)}
+              className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-50"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -181,10 +239,12 @@ function ClosedSurveyCard({ survey }: { survey: Survey }) {
 }
 
 export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
-  const { data: surveys, isLoading } = useTeamPsychSafetySurveys(teamId)
+  const { data: surveys, isLoading, refetch } = useTeamPsychSafetySurveys(teamId)
   const createSurvey = useCreatePsychSafetySurvey()
   const activateSurvey = useActivateSurvey()
+  const closeSurvey = useCloseSurvey()
   const [isCreating, setIsCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const activeSurveys = surveys?.filter(s => s.status === 'active') || []
   const closedSurveys = surveys?.filter(s => s.status === 'closed') || []
@@ -193,11 +253,26 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
 
   const handleCreateAndActivate = async () => {
     setIsCreating(true)
+    setError(null)
     try {
       const survey = await createSurvey.mutateAsync({ team_id: teamId })
       await activateSurvey.mutateAsync(survey.id)
+      refetch()
+    } catch (err) {
+      setError('Failed to create assessment. Please try again.')
+      console.error('Failed to create psych safety survey:', err)
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const handleCloseSurvey = async (surveyId: string) => {
+    try {
+      await closeSurvey.mutateAsync(surveyId)
+      refetch()
+    } catch (err) {
+      setError('Failed to close assessment. Please try again.')
+      console.error('Failed to close psych safety survey:', err)
     }
   }
 
@@ -221,6 +296,18 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
         )}
       </div>
 
+      {/* Error message */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="animate-pulse space-y-3">
           <div className="h-20 bg-pearson-gray-200 rounded"></div>
@@ -229,7 +316,7 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
         <div className="space-y-4">
           {/* Active Surveys */}
           {activeSurveys.map(survey => (
-            <ActiveSurveyCard key={survey.id} survey={survey} />
+            <ActiveSurveyCard key={survey.id} survey={survey} onClose={handleCloseSurvey} />
           ))}
 
           {/* Draft Surveys (shouldn't normally exist, but handle) */}

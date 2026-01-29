@@ -45,6 +45,7 @@ function SurveyCard({
   const [showMappingModal, setShowMappingModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [showGenerateOptions, setShowGenerateOptions] = useState(false)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [useTaskSpecific, setUseTaskSpecific] = useState(true)
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const generateLink = useGenerateSurveyLink()
@@ -190,13 +191,40 @@ function SurveyCard({
               {generateLink.isPending ? 'Generating...' : 'Get Response Link'}
             </button>
             <button
-              onClick={() => onClose(survey.id)}
+              onClick={() => setShowCloseConfirm(true)}
               disabled={isClosing}
-              className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
             >
               {isClosing ? 'Closing...' : 'Close Survey'}
             </button>
           </>
+        )}
+
+        {/* Close Survey Confirmation */}
+        {showCloseConfirm && (
+          <div className="w-full mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800 mb-2">
+              <strong>Close this survey?</strong> No more responses can be collected. Results will be calculated with {stats?.complete_responses || 0} responses.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  onClose(survey.id)
+                  setShowCloseConfirm(false)
+                }}
+                disabled={isClosing}
+                className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+              >
+                {isClosing ? 'Closing...' : 'Yes, Close Survey'}
+              </button>
+              <button
+                onClick={() => setShowCloseConfirm(false)}
+                className="px-3 py-1.5 text-sm bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
 
         {survey.status === 'closed' && stats && stats.meets_privacy_threshold && (

@@ -370,7 +370,7 @@ export function SurveyPage() {
         )}
 
         {/* Question navigation dots */}
-        <div className="flex justify-center mt-6 gap-1 flex-wrap">
+        <div className="flex justify-center mt-6 gap-2 flex-wrap">
           {sortedQuestions.map((q, index) => {
             const isAnswered = answers.has(q.id)
             const isCurrent = index === currentQuestionIndex
@@ -379,14 +379,15 @@ export function SurveyPage() {
               <button
                 key={q.id}
                 onClick={() => setCurrentQuestionIndex(index)}
-                className={`w-2.5 h-2.5 rounded-full transition-all ${
+                className={`w-4 h-4 rounded-full transition-all touch-manipulation ${
                   isCurrent
-                    ? 'bg-pearson-blue scale-125'
+                    ? 'bg-pearson-blue ring-2 ring-pearson-blue ring-offset-2'
                     : isAnswered
                     ? 'bg-pearson-green'
-                    : 'bg-pearson-gray-300'
+                    : 'bg-pearson-gray-300 hover:bg-pearson-gray-400'
                 }`}
                 title={`Question ${index + 1}${isAnswered ? ' (answered)' : ''}`}
+                aria-label={`Go to question ${index + 1}${isAnswered ? ' (answered)' : ''}`}
               />
             )
           })}

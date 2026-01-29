@@ -92,14 +92,14 @@ export function OpportunityCard({ opportunity, onStatusChange, compact = false }
             <div className="text-xs text-pearson-gray-500">Confidence</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-pearson-gray-800">{effort}w</div>
-            <div className="text-xs text-pearson-gray-500">Effort</div>
+            <div className="text-lg font-semibold text-pearson-gray-800">{effort}</div>
+            <div className="text-xs text-pearson-gray-500">Effort (wks)</div>
           </div>
         </div>
       )}
 
       {/* Status change buttons */}
-      {onStatusChange && status !== 'completed' && status !== 'deferred' && (
+      {onStatusChange && (
         <div className="flex gap-2 mt-4 pt-4 border-t border-pearson-gray-100">
           {status === 'identified' && (
             <button
@@ -124,6 +124,14 @@ export function OpportunityCard({ opportunity, onStatusChange, compact = false }
                 Defer
               </button>
             </>
+          )}
+          {(status === 'completed' || status === 'deferred') && (
+            <button
+              onClick={() => onStatusChange('in_progress')}
+              className="btn-secondary text-sm"
+            >
+              Reopen
+            </button>
           )}
         </div>
       )}
