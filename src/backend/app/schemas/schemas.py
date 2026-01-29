@@ -16,6 +16,7 @@ from app.models.models import (
     QuestionType,
     Severity,
     SurveyStatus,
+    SurveyType,
     TaskCategory,
     TrendDirection,
 )
@@ -205,6 +206,7 @@ class SurveyCreate(BaseModel):
     occupation_id: str
     team_id: str
     name: str
+    survey_type: SurveyType = SurveyType.CORE_FRICTION
     anonymous_mode: bool = True
     estimated_completion_minutes: int = 7
     closes_at: Optional[datetime] = None
@@ -215,6 +217,7 @@ class SurveyResponse(BaseSchema):
     occupation_id: str
     team_id: str
     name: str
+    survey_type: SurveyType
     status: SurveyStatus
     anonymous_mode: bool
     estimated_completion_minutes: int
@@ -562,3 +565,42 @@ class APIError(BaseModel):
     code: str
     message: str
     details: Optional[dict] = None
+
+
+# Psychological Safety Assessment schemas
+class PsychSafetyItemScore(BaseModel):
+    """Individual item score from Edmondson's scale."""
+
+    item_number: int
+    item_text: str
+    score: float  # 1-7 scale
+    is_reverse_scored: bool
+
+
+class PsychSafetyResult(BaseModel):
+    """Psychological safety assessment result for a team."""
+
+    team_id: str
+    survey_id: str
+    calculation_date: datetime
+    respondent_count: int
+    meets_privacy_threshold: bool
+
+    # Overall score (1-7 scale, higher = more psychologically safe)
+    overall_score: Optional[float] = None
+
+    # Individual item scores
+    item_scores: Optional[list[PsychSafetyItemScore]] = None
+
+    # Interpretation
+    interpretation: Optional[str] = None  # "Low", "Moderate", "High"
+
+    # Benchmark comparison
+    benchmark_percentile: Optional[int] = None
+
+
+class PsychSafetyCreateRequest(BaseModel):
+    """Request to create a psychological safety survey for a team."""
+
+    team_id: str
+    name: Optional[str] = None  # Defaults to "Psychological Safety Assessment"

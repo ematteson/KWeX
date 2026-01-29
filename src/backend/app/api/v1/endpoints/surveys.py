@@ -10,9 +10,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.database import get_db
-from app.models import Survey, Team, Occupation, Response, SurveyStatus, Question
-from app.schemas import SurveyCreate, SurveyResponse, SurveyResponseStats, QuestionResponse
+from app.models import Survey, Team, Occupation, Response, SurveyStatus, SurveyType, Question
+from app.schemas import (
+    SurveyCreate,
+    SurveyResponse,
+    SurveyResponseStats,
+    QuestionResponse,
+    PsychSafetyResult,
+    PsychSafetyCreateRequest,
+)
 from app.services.survey_generator import SurveyGenerator
+from app.services.psych_safety_service import PsychSafetyService, create_psych_safety_survey
 
 router = APIRouter(prefix="/surveys", tags=["surveys"])
 settings = get_settings()
@@ -22,6 +30,7 @@ settings = get_settings()
 def list_surveys(
     status: Optional[SurveyStatus] = None,
     team_id: Optional[str] = None,
+    survey_type: Optional[SurveyType] = None,
     db: Session = Depends(get_db),
 ):
     """List all surveys with optional filters."""
@@ -30,6 +39,8 @@ def list_surveys(
         query = query.filter(Survey.status == status)
     if team_id:
         query = query.filter(Survey.team_id == team_id)
+    if survey_type:
+        query = query.filter(Survey.survey_type == survey_type)
     return query.all()
 
 
@@ -103,8 +114,9 @@ async def generate_survey_questions(
     db: Session = Depends(get_db),
 ):
     """
-    Generate questions for a survey based on its occupation.
+    Generate questions for a survey based on its type and occupation.
 
+    For CORE_FRICTION surveys:
     - use_task_specific: Include questions tied to specific occupation tasks from Faethm
     - use_llm: Use LLM to generate contextual questions (default True, falls back to static)
     - max_questions: Maximum number of questions (default 18 for < 7 min completion)
@@ -115,7 +127,10 @@ async def generate_survey_questions(
     - Process: How streamlined are workflows
     - Rework: How often work must be redone
     - Delay: How much time is spent waiting
-    - Safety: Psychological safety and decision stability
+    - Voice: Behavioral indicators of speak-up culture
+
+    For PSYCHOLOGICAL_SAFETY surveys:
+    Uses Edmondson's validated 7-item scale (questions are fixed).
     """
     survey = db.query(Survey).filter(Survey.id == survey_id).first()
     if not survey:
@@ -134,7 +149,15 @@ async def generate_survey_questions(
 
     questions = None
 
-    # Try LLM generation if enabled and not in mock mode
+    # Handle PSYCHOLOGICAL_SAFETY surveys with dedicated service
+    if survey.survey_type == SurveyType.PSYCHOLOGICAL_SAFETY:
+        psych_service = PsychSafetyService(db)
+        questions = psych_service.generate_assessment_questions(survey)
+        survey.estimated_completion_minutes = 3  # 7 questions = ~3 minutes
+        db.commit()
+        return questions
+
+    # CORE_FRICTION surveys: Try LLM generation if enabled and not in mock mode
     if use_llm and not settings.llm_mock:
         try:
             from app.services.question_generation_service import QuestionGenerationService
@@ -256,6 +279,7 @@ def clone_survey(
         name=new_name,
         occupation_id=original.occupation_id,
         team_id=new_team_id or original.team_id,
+        survey_type=original.survey_type,
         status=SurveyStatus.DRAFT,
         anonymous_mode=original.anonymous_mode,
         estimated_completion_minutes=original.estimated_completion_minutes,
@@ -343,3 +367,105 @@ def get_survey_stats(survey_id: str, db: Session = Depends(get_db)):
         meets_privacy_threshold=complete_responses >= settings.min_respondents_for_display,
         average_completion_time_seconds=avg_time,
     )
+
+
+# ============================================================================
+# Psychological Safety Assessment Endpoints
+# ============================================================================
+
+
+@router.post("/psych-safety", response_model=SurveyResponse, status_code=201)
+def create_psych_safety_assessment(
+    request: PsychSafetyCreateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new Psychological Safety assessment survey.
+
+    Uses Amy Edmondson's validated 7-item scale to measure team psychological safety.
+    This is a separate assessment from core friction surveys, using validated questions
+    that should not be modified.
+
+    The assessment takes approximately 3 minutes to complete.
+    """
+    # Verify team exists
+    team = db.query(Team).filter(Team.id == request.team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Create the survey with questions
+    survey = create_psych_safety_survey(
+        db=db,
+        team_id=request.team_id,
+        occupation_id=team.occupation_id,
+        name=request.name,
+    )
+
+    return survey
+
+
+@router.get("/{survey_id}/psych-safety-results", response_model=PsychSafetyResult)
+def get_psych_safety_results(survey_id: str, db: Session = Depends(get_db)):
+    """
+    Get psychological safety assessment results for a survey.
+
+    Returns:
+    - overall_score: 1-7 scale (higher = more psychologically safe)
+    - item_scores: Individual scores for each of the 7 items
+    - interpretation: "Low", "Moderate", or "High"
+    - benchmark_percentile: How this team compares to benchmarks
+
+    Results are only available if the privacy threshold is met.
+    """
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if survey.survey_type != SurveyType.PSYCHOLOGICAL_SAFETY:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is only for PSYCHOLOGICAL_SAFETY surveys. Use /metrics for core friction surveys.",
+        )
+
+    service = PsychSafetyService(db)
+    result = service.calculate_psych_safety_score(survey)
+
+    return PsychSafetyResult(**result)
+
+
+@router.get("/{survey_id}/psych-safety-dimensions")
+def get_psych_safety_dimensions(survey_id: str, db: Session = Depends(get_db)):
+    """
+    Get psychological safety scores broken down by dimension.
+
+    Dimensions:
+    - error_tolerance: Tolerance for mistakes
+    - openness: Ability to discuss problems
+    - inclusion: Acceptance of differences
+    - risk_taking: Safety to take risks
+    - help_seeking: Comfort asking for help
+    - mutual_respect: Trust in teammates
+    - contribution: Feeling valued
+
+    Results are only available if the privacy threshold is met.
+    """
+    survey = db.query(Survey).filter(Survey.id == survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if survey.survey_type != SurveyType.PSYCHOLOGICAL_SAFETY:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is only for PSYCHOLOGICAL_SAFETY surveys.",
+        )
+
+    service = PsychSafetyService(db)
+    dimensions = service.get_dimension_breakdown(survey)
+
+    if dimensions is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Results not available. Privacy threshold may not be met.",
+        )
+
+    return {"survey_id": survey_id, "dimensions": dimensions}

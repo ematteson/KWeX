@@ -12,7 +12,7 @@ import type { CSVUploadResult, AvailableOccupation, Occupation } from '../api/ty
 
 export function TeamsPage() {
   const navigate = useNavigate()
-  const { data: teams, isLoading, error, refetch } = useTeams()
+  const { data: teams, isLoading, error } = useTeams()
   const { data: occupations, refetch: refetchOccupations } = useOccupations()
   const syncOccupations = useSyncOccupations()
   const syncSingleOccupation = useSyncSingleOccupation()

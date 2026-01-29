@@ -4,6 +4,7 @@ import { MetricCard } from '../components/MetricCard'
 import { FrictionHeatmap } from '../components/FrictionHeatmap'
 import { MetricsTrendChart } from '../components/MetricsTrendChart'
 import { SurveyManagement } from '../components/SurveyManagement'
+import { PsychSafetyCard } from '../components/PsychSafetyCard'
 
 export function TeamDashboard() {
   const { teamId } = useParams<{ teamId: string }>()
@@ -210,6 +211,9 @@ export function TeamDashboard() {
           )}
         </section>
       </div>
+
+      {/* Psychological Safety Assessment */}
+      {teamId && <PsychSafetyCard teamId={teamId} />}
 
       {/* Top Opportunities */}
       <section>

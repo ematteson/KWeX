@@ -130,24 +130,29 @@ QUESTION_TEMPLATES = {
             "core": False,
         },
     ],
+    # VOICE dimension - measures behavioral indicators of speak-up culture
+    # (Psychological safety proper is measured via separate dedicated assessment)
     FrictionType.SAFETY: [
         {
-            "text": "Can you raise concerns or problems without negative consequences?",
+            "text": "When issues or blockers arise, how quickly are they typically raised with the team?",
             "type": QuestionType.LIKERT_5,
-            "metrics": [MetricType.SAFETY],
+            "metrics": [MetricType.SAFETY, MetricType.FRICTION],
             "core": True,
+            "options": {"low_label": "Often delayed or not raised", "high_label": "Raised immediately"},
         },
         {
-            "text": "How comfortable are you admitting mistakes or asking for help?",
+            "text": "When someone makes a mistake, how constructively is it typically addressed?",
             "type": QuestionType.LIKERT_5,
             "metrics": [MetricType.SAFETY],
             "core": False,
+            "options": {"low_label": "Blame-focused", "high_label": "Learning-focused"},
         },
         {
-            "text": "How often are important decisions reversed after significant work?",
+            "text": "How often do you see problems or inefficiencies that aren't being discussed openly?",
             "type": QuestionType.LIKERT_5,
             "metrics": [MetricType.SAFETY, MetricType.FRICTION],
             "core": False,
+            "options": {"low_label": "Very often", "high_label": "Rarely or never"},
         },
     ],
 }

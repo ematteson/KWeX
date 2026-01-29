@@ -44,6 +44,13 @@ class SurveyStatus(str, enum.Enum):
     CLOSED = "closed"
 
 
+class SurveyType(str, enum.Enum):
+    """Type of survey - determines question generation and scoring."""
+    CORE_FRICTION = "core_friction"  # Standard KWeX Core 4 metrics survey
+    PSYCHOLOGICAL_SAFETY = "psychological_safety"  # Edmondson's 7-item scale
+    CUSTOM = "custom"  # User-defined questions
+
+
 class QuestionType(str, enum.Enum):
     LIKERT_5 = "likert_5"
     LIKERT_7 = "likert_7"
@@ -242,6 +249,9 @@ class Survey(Base):
     occupation_id: Mapped[str] = mapped_column(String(36), ForeignKey("occupations.id"))
     team_id: Mapped[str] = mapped_column(String(36), ForeignKey("teams.id"))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    survey_type: Mapped[SurveyType] = mapped_column(
+        Enum(SurveyType), default=SurveyType.CORE_FRICTION
+    )
     status: Mapped[SurveyStatus] = mapped_column(Enum(SurveyStatus), default=SurveyStatus.DRAFT)
     anonymous_mode: Mapped[bool] = mapped_column(Boolean, default=True)
     estimated_completion_minutes: Mapped[int] = mapped_column(Integer, default=7)

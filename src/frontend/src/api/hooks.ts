@@ -29,6 +29,9 @@ import type {
   BulkTimeAllocationUpdate,
   AllocationSummary,
   TaskCategory,
+  PsychSafetyResult,
+  PsychSafetyDimensions,
+  PsychSafetyCreateRequest,
 } from './types'
 
 // Teams
@@ -852,5 +855,59 @@ export function useGenerateSampleData() {
       queryClient.invalidateQueries({ queryKey: ['status'] })
       queryClient.invalidateQueries({ queryKey: ['metrics'] })
     },
+  })
+}
+
+// ============================================================================
+// Psychological Safety Assessment Hooks
+// ============================================================================
+
+export function useCreatePsychSafetySurvey() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: PsychSafetyCreateRequest) => {
+      const { data } = await apiClient.post<Survey>('/surveys/psych-safety', request)
+      return data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['surveys', 'team', data.team_id] })
+    },
+  })
+}
+
+export function usePsychSafetyResults(surveyId: string) {
+  return useQuery({
+    queryKey: ['psych-safety', surveyId, 'results'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PsychSafetyResult>(`/surveys/${surveyId}/psych-safety-results`)
+      return data
+    },
+    enabled: !!surveyId,
+  })
+}
+
+export function usePsychSafetyDimensions(surveyId: string) {
+  return useQuery({
+    queryKey: ['psych-safety', surveyId, 'dimensions'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PsychSafetyDimensions>(`/surveys/${surveyId}/psych-safety-dimensions`)
+      return data
+    },
+    enabled: !!surveyId,
+  })
+}
+
+// Get all psych safety surveys for a team
+export function useTeamPsychSafetySurveys(teamId: string) {
+  return useQuery({
+    queryKey: ['surveys', 'team', teamId, 'psych-safety'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Survey[]>('/surveys', {
+        params: { team_id: teamId, survey_type: 'PSYCHOLOGICAL_SAFETY' }
+      })
+      return data
+    },
+    enabled: !!teamId,
   })
 }

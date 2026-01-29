@@ -22,7 +22,7 @@ function SurveyCard({
   onGenerateQuestions,
   onActivate,
   onClose,
-  onGenerateLink,
+  onGenerateLink: _onGenerateLink,
   onClone,
   isGeneratingQuestions,
   isActivating,

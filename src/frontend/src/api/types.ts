@@ -2,6 +2,7 @@
 export type FrictionType = 'clarity' | 'tooling' | 'process' | 'rework' | 'delay' | 'safety'
 export type QuestionType = 'likert_5' | 'likert_7' | 'multiple_choice' | 'percentage_slider' | 'free_text'
 export type SurveyStatus = 'draft' | 'active' | 'closed'
+export type SurveyType = 'CORE_FRICTION' | 'PSYCHOLOGICAL_SAFETY' | 'CUSTOM'
 export type OpportunityStatus = 'identified' | 'in_progress' | 'completed' | 'deferred'
 export type TrendDirection = 'up' | 'down' | 'stable'
 export type TaskCategory = 'core' | 'support' | 'admin'
@@ -22,6 +23,7 @@ export interface Survey {
   occupation_id: string
   team_id: string
   name: string
+  survey_type: SurveyType
   status: SurveyStatus
   anonymous_mode: boolean
   estimated_completion_minutes: number
@@ -399,4 +401,34 @@ export interface AllocationSummary {
   total_tasks: number
   total_percentage: number
   tasks_with_allocation: number
+}
+
+// Psychological Safety Types
+export interface PsychSafetyItemScore {
+  item_number: number
+  item_text: string
+  score: number
+  is_reverse_scored: boolean
+}
+
+export interface PsychSafetyResult {
+  team_id: string
+  survey_id: string
+  calculation_date: string
+  respondent_count: number
+  meets_privacy_threshold: boolean
+  overall_score: number | null
+  item_scores: PsychSafetyItemScore[] | null
+  interpretation: 'Low' | 'Moderate' | 'High' | null
+  benchmark_percentile: number | null
+}
+
+export interface PsychSafetyDimensions {
+  survey_id: string
+  dimensions: Record<string, number>
+}
+
+export interface PsychSafetyCreateRequest {
+  team_id: string
+  name?: string
 }

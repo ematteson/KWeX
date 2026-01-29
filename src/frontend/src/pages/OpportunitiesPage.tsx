@@ -17,7 +17,7 @@ export function OpportunitiesPage() {
   const { teamId } = useParams<{ teamId: string }>()
   const [statusFilter, setStatusFilter] = useState<OpportunityStatus | 'all'>('all')
 
-  const { data: team, isLoading: teamLoading } = useTeam(teamId || '')
+  const { data: team, isLoading: _teamLoading } = useTeam(teamId || '')
   const { data: opportunities, isLoading: oppsLoading } = useTeamOpportunities(
     teamId || '',
     statusFilter === 'all' ? undefined : statusFilter

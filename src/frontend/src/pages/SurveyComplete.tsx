@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom'
-
 export function SurveyComplete() {
   return (
     <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center p-4">

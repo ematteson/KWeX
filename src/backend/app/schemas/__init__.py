@@ -18,6 +18,9 @@ from app.schemas.schemas import (
     OpportunityCreate,
     OpportunityResponse,
     OpportunityUpdate,
+    PsychSafetyCreateRequest,
+    PsychSafetyItemScore,
+    PsychSafetyResult,
     QuestionCreate,
     QuestionResponse,
     ResponseCreate,
@@ -60,4 +63,8 @@ __all__ = [
     "OpportunityResponse",
     "OpportunityUpdate",
     "CSVUploadResult",
+    # Psychological Safety
+    "PsychSafetyCreateRequest",
+    "PsychSafetyItemScore",
+    "PsychSafetyResult",
 ]
