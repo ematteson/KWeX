@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import styled from 'styled-components'
 import {
   useTeamSurveys,
   useCreateSurvey,
@@ -12,10 +13,269 @@ import {
 import type { Survey, Team } from '../api/types'
 import { QuestionMappingModal } from './QuestionMappingModal'
 import { SurveyPreviewModal } from './SurveyPreviewModal'
+import {
+  Card,
+  Button,
+  Heading,
+  Text,
+  Spinner,
+  Input,
+  Label,
+  Flex,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from '../design-system/components'
 
 interface SurveyManagementProps {
   team: Team
 }
+
+// Styled Components
+const SurveyCardContainer = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+`
+
+const SurveyHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const SurveyTitle = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const SurveyDate = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0;
+`
+
+const StatusBadge = styled.span<{ $status: 'draft' | 'active' | 'closed' }>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+
+  ${({ theme, $status }) => {
+    switch ($status) {
+      case 'active':
+        return `
+          background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.success.default};
+        `
+      case 'closed':
+        return `
+          background-color: ${theme.v1.semanticColors.fill.neutral.light};
+          color: ${theme.v1.semanticColors.text.body.default};
+        `
+      default:
+        return `
+          background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.warning.default};
+        `
+    }
+  }}
+`
+
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const StatBox = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+  text-align: center;
+`
+
+const StatValue = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const StatLabel = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0;
+`
+
+const PrivacyIndicator = styled.div<{ $met: boolean }>`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+
+  ${({ theme, $met }) => $met
+    ? `
+      background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+      color: ${theme.v1.semanticColors.text.feedback.success.default};
+    `
+    : `
+      background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+      color: ${theme.v1.semanticColors.text.feedback.warning.default};
+    `
+  }
+`
+
+const ActionsContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const GenerateOptionsBox = styled.div`
+  width: 100%;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.info.subtle};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const OptionsTitle = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.info.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const Checkbox = styled.input`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const CheckboxText = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.info.default};
+`
+
+const CloseConfirmBox = styled.div`
+  width: 100%;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.subtle};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.warning};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+`
+
+const CloseConfirmText = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const MetricsCalculatedText = styled.span`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingMD};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.success.default};
+`
+
+const LinkModalInput = styled(Input)`
+  flex: 1;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+`
+
+const SectionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const SurveySection = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const SurveyList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const LoadingContainer = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+`
+
+const HeaderWrapper = styled.div`
+  flex: 1;
+`
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS};
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  transition: color 0.2s;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  }
+`
+
+const WarningButton = styled(Button)`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.inverse};
+
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.v1.colors.status.yellow[700]};
+  }
+`
+
+const GhostButtonOutlined = styled(Button)`
+  background-color: transparent;
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.warning};
+
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.subtle};
+  }
+`
+
+const PreviewButton = styled(Button)`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.help.subtle};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.help.default};
+
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.v1.colors.status.purple[25]};
+  }
+`
+
+const CloneButton = styled(Button)`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.info.subtle};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.info.default};
+
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.v1.colors.status.blue[25]};
+  }
+`
 
 function SurveyCard({
   survey,
@@ -67,204 +327,197 @@ function SurveyCard({
     }
   }
 
-  const statusColors = {
-    draft: 'bg-yellow-100 text-yellow-800',
-    active: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-800',
-  }
-
   const hasQuestions = survey.questions && survey.questions.length > 0
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-      <div className="flex justify-between items-start mb-3">
+    <SurveyCardContainer>
+      <SurveyHeader>
         <div>
-          <h3 className="font-semibold text-gray-900">{survey.name}</h3>
-          <p className="text-sm text-gray-500">
+          <SurveyTitle>{survey.name}</SurveyTitle>
+          <SurveyDate>
             Created {new Date(survey.created_at).toLocaleDateString()}
-          </p>
+          </SurveyDate>
         </div>
-        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[survey.status]}`}>
+        <StatusBadge $status={survey.status}>
           {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
-        </span>
-      </div>
+        </StatusBadge>
+      </SurveyHeader>
 
       {/* Survey Stats */}
       {stats && (
-        <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-          <div className="bg-gray-50 rounded p-2">
-            <p className="text-lg font-bold text-gray-900">{stats.complete_responses}</p>
-            <p className="text-xs text-gray-500">Responses</p>
-          </div>
-          <div className="bg-gray-50 rounded p-2">
-            <p className="text-lg font-bold text-gray-900">{survey.questions?.length || 0}</p>
-            <p className="text-xs text-gray-500">Questions</p>
-          </div>
-          <div className="bg-gray-50 rounded p-2">
-            <p className="text-lg font-bold text-gray-900">{survey.estimated_completion_minutes || '-'}</p>
-            <p className="text-xs text-gray-500">Est. Minutes</p>
-          </div>
-        </div>
+        <StatsGrid>
+          <StatBox>
+            <StatValue>{stats.complete_responses}</StatValue>
+            <StatLabel>Responses</StatLabel>
+          </StatBox>
+          <StatBox>
+            <StatValue>{survey.questions?.length || 0}</StatValue>
+            <StatLabel>Questions</StatLabel>
+          </StatBox>
+          <StatBox>
+            <StatValue>{survey.estimated_completion_minutes || '-'}</StatValue>
+            <StatLabel>Est. Minutes</StatLabel>
+          </StatBox>
+        </StatsGrid>
       )}
 
       {/* Privacy Threshold Indicator */}
       {stats && survey.status === 'active' && (
-        <div className={`mb-4 p-2 rounded text-sm ${
-          stats.meets_privacy_threshold
-            ? 'bg-green-50 text-green-700'
-            : 'bg-yellow-50 text-yellow-700'
-        }`}>
+        <PrivacyIndicator $met={stats.meets_privacy_threshold}>
           {stats.meets_privacy_threshold ? (
             <span>Privacy threshold met - metrics available</span>
           ) : (
             <span>Need {7 - stats.complete_responses} more responses for metrics</span>
           )}
-        </div>
+        </PrivacyIndicator>
       )}
 
       {/* Actions based on status */}
-      <div className="flex flex-wrap gap-2">
+      <ActionsContainer>
         {survey.status === 'draft' && !hasQuestions && !showGenerateOptions && (
-          <button
+          <Button
+            $size="sm"
             onClick={() => setShowGenerateOptions(true)}
             disabled={isGeneratingQuestions}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             Generate Questions
-          </button>
+          </Button>
         )}
 
         {survey.status === 'draft' && !hasQuestions && showGenerateOptions && (
-          <div className="w-full bg-blue-50 rounded-lg p-3 space-y-3">
-            <p className="text-sm font-medium text-blue-900">Question Generation Options</p>
-            <label className="flex items-start gap-2">
-              <input
+          <GenerateOptionsBox>
+            <OptionsTitle>Question Generation Options</OptionsTitle>
+            <CheckboxLabel>
+              <Checkbox
                 type="checkbox"
                 checked={useTaskSpecific}
                 onChange={(e) => setUseTaskSpecific(e.target.checked)}
-                className="mt-1 rounded border-gray-300"
               />
-              <span className="text-sm text-blue-800">
+              <CheckboxText>
                 <strong>Include task-specific questions</strong>
                 <br />
-                <span className="text-blue-600">Links questions to Faethm occupation tasks for contextual relevance</span>
-              </span>
-            </label>
-            <div className="flex gap-2">
-              <button
+                <span style={{ opacity: 0.8 }}>Links questions to Faethm occupation tasks for contextual relevance</span>
+              </CheckboxText>
+            </CheckboxLabel>
+            <Flex $gap="spacingSM" style={{ marginTop: '0.75rem' }}>
+              <Button
+                $size="sm"
                 onClick={() => {
                   onGenerateQuestions(survey.id, useTaskSpecific)
                   setShowGenerateOptions(false)
                 }}
                 disabled={isGeneratingQuestions}
-                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 {isGeneratingQuestions ? 'Generating...' : 'Generate'}
-              </button>
-              <button
+              </Button>
+              <Button
+                $size="sm"
+                $variant="secondary"
                 onClick={() => setShowGenerateOptions(false)}
-                className="px-3 py-1.5 text-sm bg-white text-blue-700 border border-blue-300 rounded hover:bg-blue-100"
               >
                 Cancel
-              </button>
-            </div>
-          </div>
+              </Button>
+            </Flex>
+          </GenerateOptionsBox>
         )}
 
         {survey.status === 'draft' && hasQuestions && (
-          <button
+          <Button
+            $size="sm"
+            style={{ backgroundColor: '#1C826A' }}
             onClick={() => onActivate(survey.id)}
             disabled={isActivating}
-            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
           >
             {isActivating ? 'Activating...' : 'Activate Survey'}
-          </button>
+          </Button>
         )}
 
         {survey.status === 'active' && (
           <>
-            <button
+            <Button
+              $size="sm"
               onClick={handleGenerateLink}
               disabled={generateLink.isPending}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             >
               {generateLink.isPending ? 'Generating...' : 'Get Response Link'}
-            </button>
-            <button
+            </Button>
+            <Button
+              $size="sm"
+              $variant="ghost"
               onClick={() => setShowCloseConfirm(true)}
               disabled={isClosing}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
             >
               {isClosing ? 'Closing...' : 'Close Survey'}
-            </button>
+            </Button>
           </>
         )}
 
         {/* Close Survey Confirmation */}
         {showCloseConfirm && (
-          <div className="w-full mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800 mb-2">
+          <CloseConfirmBox>
+            <CloseConfirmText>
               <strong>Close this survey?</strong> No more responses can be collected. Results will be calculated with {stats?.complete_responses || 0} responses.
-            </p>
-            <div className="flex gap-2">
-              <button
+            </CloseConfirmText>
+            <Flex $gap="spacingSM">
+              <WarningButton
+                $size="sm"
                 onClick={() => {
                   onClose(survey.id)
                   setShowCloseConfirm(false)
                 }}
                 disabled={isClosing}
-                className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
               >
                 {isClosing ? 'Closing...' : 'Yes, Close Survey'}
-              </button>
-              <button
+              </WarningButton>
+              <GhostButtonOutlined
+                $size="sm"
                 onClick={() => setShowCloseConfirm(false)}
-                className="px-3 py-1.5 text-sm bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-50"
               >
                 Cancel
-              </button>
-            </div>
-          </div>
+              </GhostButtonOutlined>
+            </Flex>
+          </CloseConfirmBox>
         )}
 
         {survey.status === 'closed' && stats && stats.meets_privacy_threshold && (
-          <span className="px-3 py-1.5 text-sm text-green-700">
+          <MetricsCalculatedText>
             Metrics calculated
-          </span>
+          </MetricsCalculatedText>
         )}
 
         {/* View Mapping button - show if survey has questions */}
         {hasQuestions && (
           <>
-            <button
+            <PreviewButton
+              $size="sm"
               onClick={() => setShowPreviewModal(true)}
-              className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 flex items-center gap-1"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
               Preview All
-            </button>
-            <button
+            </PreviewButton>
+            <Button
+              $size="sm"
+              $variant="ghost"
               onClick={() => setShowMappingModal(true)}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
             >
               View Mapping
-            </button>
-            <button
+            </Button>
+            <CloneButton
+              $size="sm"
               onClick={() => onClone(survey.id)}
               disabled={isCloning}
-              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 flex items-center gap-1"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               {isCloning ? 'Cloning...' : 'Clone'}
-            </button>
+            </CloneButton>
           </>
         )}
-      </div>
+      </ActionsContainer>
 
       {/* Survey Preview Modal */}
       <SurveyPreviewModal
@@ -282,47 +535,46 @@ function SurveyCard({
 
       {/* Link Modal */}
       {showLinkModal && generatedLink && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-4">Survey Response Link</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Share this unique link with a team member. Each link can only be used once.
-            </p>
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                readOnly
-                value={generatedLink}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-              />
-              <button
-                onClick={copyToClipboard}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-              >
-                Copy
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button
+        <ModalOverlay>
+          <ModalContent $size="md">
+            <ModalHeader>
+              <Heading $level={3}>Survey Response Link</Heading>
+            </ModalHeader>
+            <ModalBody>
+              <Text $variant="bodySmall" $color="subtle" style={{ marginBottom: '1rem' }}>
+                Share this unique link with a team member. Each link can only be used once.
+              </Text>
+              <Flex $gap="spacingSM" style={{ marginBottom: '1rem' }}>
+                <LinkModalInput
+                  type="text"
+                  readOnly
+                  value={generatedLink}
+                />
+                <Button onClick={copyToClipboard}>
+                  Copy
+                </Button>
+              </Flex>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                $variant="secondary"
                 onClick={handleGenerateLink}
-                className="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
                 Generate Another
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setShowLinkModal(false)
                   setGeneratedLink(null)
                 }}
-                className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Done
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </ModalOverlay>
       )}
-    </div>
+    </SurveyCardContainer>
   )
 }
 
@@ -409,32 +661,29 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
   const closedSurveys = surveys?.filter(s => s.status === 'closed') || []
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="flex justify-between items-center mb-6">
+    <Card $variant="outlined" $padding="lg">
+      <Flex $justify="between" $align="center" style={{ marginBottom: '1.5rem' }}>
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Surveys</h2>
-          <p className="text-sm text-gray-500">Create and manage team surveys</p>
+          <Heading $level={3}>Surveys</Heading>
+          <Text $variant="bodySmall" $color="subtle">Create and manage team surveys</Text>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-        >
+        <Button $size="sm" onClick={() => setShowCreateModal(true)}>
           New Survey
-        </button>
-      </div>
+        </Button>
+      </Flex>
 
       {isLoading ? (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading surveys...</p>
-        </div>
+        <LoadingContainer>
+          <Spinner />
+          <Text $color="subtle" style={{ marginTop: '0.5rem' }}>Loading surveys...</Text>
+        </LoadingContainer>
       ) : (
-        <div className="space-y-6">
+        <div>
           {/* Active Surveys */}
           {activeSurveys.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Active Surveys</h3>
-              <div className="space-y-3">
+            <SurveySection>
+              <SectionTitle>Active Surveys</SectionTitle>
+              <SurveyList>
                 {activeSurveys.map(survey => (
                   <SurveyCard
                     key={survey.id}
@@ -450,15 +699,15 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
-              </div>
-            </div>
+              </SurveyList>
+            </SurveySection>
           )}
 
           {/* Draft Surveys */}
           {draftSurveys.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Draft Surveys</h3>
-              <div className="space-y-3">
+            <SurveySection>
+              <SectionTitle>Draft Surveys</SectionTitle>
+              <SurveyList>
                 {draftSurveys.map(survey => (
                   <SurveyCard
                     key={survey.id}
@@ -474,15 +723,15 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
-              </div>
-            </div>
+              </SurveyList>
+            </SurveySection>
           )}
 
           {/* Closed Surveys */}
           {closedSurveys.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Closed Surveys</h3>
-              <div className="space-y-3">
+            <SurveySection>
+              <SectionTitle>Closed Surveys</SectionTitle>
+              <SurveyList>
                 {closedSurveys.map(survey => (
                   <SurveyCard
                     key={survey.id}
@@ -498,60 +747,68 @@ export function SurveyManagement({ team }: SurveyManagementProps) {
                     isCloning={cloningId === survey.id && cloneSurvey.isPending}
                   />
                 ))}
-              </div>
-            </div>
+              </SurveyList>
+            </SurveySection>
           )}
 
           {/* Empty State */}
           {(!surveys || surveys.length === 0) && (
-            <div className="text-center py-8 text-gray-500">
-              <p>No surveys yet. Create one to start collecting feedback.</p>
-            </div>
+            <EmptyState>
+              <Text>No surveys yet. Create one to start collecting feedback.</Text>
+            </EmptyState>
           )}
         </div>
       )}
 
       {/* Create Survey Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-4">Create New Survey</h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Survey Name
-              </label>
-              <input
-                type="text"
-                value={newSurveyName}
-                onChange={(e) => setNewSurveyName(e.target.value)}
-                placeholder="e.g., Q1 2026 KWeX Survey"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <p className="text-sm text-gray-500 mb-4">
-              The survey will be created for team "{team.name}" using their assigned occupation's friction dimensions.
-            </p>
-            <div className="flex gap-2">
-              <button
+        <ModalOverlay>
+          <ModalContent $size="sm">
+            <ModalHeader>
+              <HeaderWrapper>
+                <Heading $level={3}>Create New Survey</Heading>
+              </HeaderWrapper>
+              <CloseButton onClick={() => { setShowCreateModal(false); setNewSurveyName(''); }}>
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </CloseButton>
+            </ModalHeader>
+            <ModalBody>
+              <div style={{ marginBottom: '1rem' }}>
+                <Label>Survey Name</Label>
+                <Input
+                  type="text"
+                  value={newSurveyName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSurveyName(e.target.value)}
+                  placeholder="e.g., Q1 2026 KWeX Survey"
+                  $fullWidth
+                />
+              </div>
+              <Text $variant="bodySmall" $color="subtle">
+                The survey will be created for team "{team.name}" using their assigned occupation's friction dimensions.
+              </Text>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                $variant="secondary"
                 onClick={() => {
                   setShowCreateModal(false)
                   setNewSurveyName('')
                 }}
-                className="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleCreateSurvey}
                 disabled={!newSurveyName.trim() || createSurvey.isPending}
-                className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {createSurvey.isPending ? 'Creating...' : 'Create Survey'}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </ModalOverlay>
       )}
-    </div>
+    </Card>
   )
 }

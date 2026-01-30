@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import styled, { css, useTheme } from 'styled-components'
 import {
   BarChart,
   Bar,
@@ -15,7 +16,281 @@ import {
   Radar,
 } from 'recharts'
 import { useAllTeamsMetrics, type TeamMetricsSummary } from '../api/hooks'
-import clsx from 'clsx'
+import { Card, CardTitle, Badge, Heading, Text, Alert } from '../design-system/components'
+
+// =============================================================================
+// STYLED COMPONENTS
+// =============================================================================
+
+const PageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacing3XL};
+`
+
+const HeaderContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+
+  @media (min-width: 640px) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+`
+
+const HeaderTextContainer = styled.div``
+
+const PageTitle = styled(Heading).attrs({ as: 'h1', $level: 2 })`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const PageSubtitle = styled(Text).attrs({ $variant: 'body', $color: 'default' })``
+
+const SecondaryButton = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingXL};
+  background-color: transparent;
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.brand.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.highlight.brand.default};
+    border-color: ${({ theme }) => theme.v1.semanticColors.border.brand.hover};
+  }
+`
+
+const SectionTitle = styled(Heading).attrs({ as: 'h2', $level: 3 })`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const MetricsGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  grid-template-columns: 1fr;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(5, 1fr);
+  }
+`
+
+interface MetricCardProps {
+  $bgColor?: string;
+}
+
+const MetricCard = styled(Card)<MetricCardProps>`
+  text-align: center;
+  ${({ $bgColor }) => $bgColor && css`background-color: ${$bgColor};`}
+`
+
+interface ScoreValueProps {
+  $color: string;
+}
+
+const ScoreValue = styled.div<ScoreValueProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.displayL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ $color }) => $color};
+`
+
+const ScoreLabel = styled(Text).attrs({ $variant: 'bodySmall', $color: 'default' })`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const ChartsGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  grid-template-columns: 1fr;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`
+
+const ChartContainer = styled.div`
+  height: 20rem;
+`
+
+const EmptyChartState = styled.div`
+  height: 20rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ChartNote = styled(Text).attrs({ $variant: 'helper', $color: 'subtle' })`
+  text-align: center;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const TeamsGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  grid-template-columns: 1fr;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`
+
+const TeamCard = styled(Link)`
+  text-decoration: none;
+  display: block;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: ${({ theme }) => theme.v1.shadows.md};
+  }
+`
+
+const TeamHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const TeamInfo = styled.div``
+
+const TeamName = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const TeamFunction = styled(Text).attrs({ $variant: 'bodySmall', $color: 'subtle' })``
+
+const TeamMetricsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  text-align: center;
+`
+
+const MetricItem = styled.div``
+
+interface TeamMetricValueProps {
+  $color: string;
+}
+
+const TeamMetricValue = styled.div<TeamMetricValueProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ $color }) => $color};
+`
+
+const TeamMetricLabel = styled(Text).attrs({ $variant: 'helper', $color: 'subtle' })``
+
+const AwaitingResponsesMessage = styled(Text).attrs({ $variant: 'bodySmall', $color: 'subtle' })`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const EmptyTeamsCard = styled.div`
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const EmptyTeamsLink = styled(Link)`
+  display: inline-block;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.link.brand.default};
+
+  &:hover {
+    text-decoration: underline;
+  }
+`
+
+const PrivacyAlert = styled(Alert).attrs({ $variant: 'info' })`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-left-color: ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const InfoIcon = styled.svg`
+  width: 1.25rem;
+  height: 1.25rem;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.neutral.default};
+  flex-shrink: 0;
+  margin-top: 2px;
+`
+
+const PrivacyContent = styled.div``
+
+const PrivacyTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.subtle};
+  margin: 0;
+`
+
+const PrivacyDescription = styled(Text).attrs({ $variant: 'bodySmall', $color: 'default' })`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+// Loading skeleton components
+const SkeletonCard = styled(Card)`
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`
+
+const SkeletonTitle = styled.div`
+  height: 1.5rem;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  width: 12rem;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const SkeletonChart = styled.div`
+  height: 12rem;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+`
+
+const LoadingGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  grid-template-columns: 1fr;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 const METRIC_COLORS = {
   flow: '#047857',      // Emerald-700
@@ -25,21 +300,25 @@ const METRIC_COLORS = {
 }
 
 function getScoreColor(score: number | null, invert = false): string {
-  if (score === null) return 'text-pearson-gray-400'
+  if (score === null) return '#737373' // grey400
   const effectiveScore = invert ? 100 - score : score
-  if (effectiveScore >= 75) return 'text-green-600'
-  if (effectiveScore >= 50) return 'text-yellow-600'
-  if (effectiveScore >= 25) return 'text-orange-500'
-  return 'text-red-600'
+  if (effectiveScore >= 75) return '#1C826A' // green-100
+  if (effectiveScore >= 50) return '#806000' // yellow-700
+  if (effectiveScore >= 25) return '#B85217' // orange-100
+  return '#C53312' // red-100
 }
 
-function getScoreBgColor(score: number | null, invert = false): string {
-  if (score === null) return 'bg-pearson-gray-100'
+function getScoreBgColor(
+  score: number | null,
+  invert = false,
+  theme: ReturnType<typeof useTheme>
+): string {
+  if (score === null) return theme.v1.semanticColors.fill.neutral.light
   const effectiveScore = invert ? 100 - score : score
-  if (effectiveScore >= 75) return 'bg-green-50'
-  if (effectiveScore >= 50) return 'bg-yellow-50'
-  if (effectiveScore >= 25) return 'bg-orange-50'
-  return 'bg-red-50'
+  if (effectiveScore >= 75) return theme.v1.semanticColors.fill.feedback.success.subtle
+  if (effectiveScore >= 50) return theme.v1.semanticColors.fill.feedback.warning.subtle
+  if (effectiveScore >= 25) return theme.v1.semanticColors.fill.feedback.orange.subtle
+  return theme.v1.semanticColors.fill.feedback.error.subtle
 }
 
 interface OrgAverages {
@@ -79,7 +358,12 @@ function calculateOrgAverages(teams: TeamMetricsSummary[]): OrgAverages {
   }
 }
 
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
 export function ExecutiveDashboard() {
+  const theme = useTheme()
   const { data: teamsMetrics, isLoading } = useAllTeamsMetrics()
 
   const orgAverages = teamsMetrics ? calculateOrgAverages(teamsMetrics) : null
@@ -105,264 +389,265 @@ export function ExecutiveDashboard() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-pearson-gray-900">Executive Dashboard</h1>
-          <p className="text-pearson-gray-600 mt-1">Cross-team metrics overview</p>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+      <PageContainer>
+        <HeaderTextContainer>
+          <PageTitle>Executive Dashboard</PageTitle>
+          <PageSubtitle>Cross-team metrics overview</PageSubtitle>
+        </HeaderTextContainer>
+        <LoadingGrid>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="h-6 bg-pearson-gray-200 rounded w-48 mb-4"></div>
-              <div className="h-48 bg-pearson-gray-200 rounded"></div>
-            </div>
+            <SkeletonCard key={i}>
+              <SkeletonTitle />
+              <SkeletonChart />
+            </SkeletonCard>
           ))}
-        </div>
-      </div>
+        </LoadingGrid>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <PageContainer>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-pearson-gray-900">Executive Dashboard</h1>
-          <p className="text-pearson-gray-600 mt-1">
-            Cross-team metrics comparison • {teamsMetrics?.length || 0} teams tracked
-          </p>
-        </div>
-        <Link to="/teams" className="btn-secondary">
+      <HeaderContainer>
+        <HeaderTextContainer>
+          <PageTitle>Executive Dashboard</PageTitle>
+          <PageSubtitle>
+            Cross-team metrics comparison - {teamsMetrics?.length || 0} teams tracked
+          </PageSubtitle>
+        </HeaderTextContainer>
+        <SecondaryButton to="/teams">
           View Team List
-        </Link>
-      </div>
+        </SecondaryButton>
+      </HeaderContainer>
 
       {/* Organization Averages */}
       {orgAverages && orgAverages.teamsWithData > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-pearson-gray-800 mb-4">Organization Averages</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div className={clsx('card text-center', getScoreBgColor(orgAverages.flow))}>
-              <div className={clsx('text-3xl font-bold', getScoreColor(orgAverages.flow))}>
+          <SectionTitle>Organization Averages</SectionTitle>
+          <MetricsGrid>
+            <MetricCard $bgColor={getScoreBgColor(orgAverages.flow, false, theme)}>
+              <ScoreValue $color={getScoreColor(orgAverages.flow)}>
                 {orgAverages.flow}
-              </div>
-              <div className="text-sm text-pearson-gray-600 mt-1">Flow</div>
-            </div>
-            <div className={clsx('card text-center', getScoreBgColor(orgAverages.friction, true))}>
-              <div className={clsx('text-3xl font-bold', getScoreColor(orgAverages.friction, true))}>
+              </ScoreValue>
+              <ScoreLabel>Flow</ScoreLabel>
+            </MetricCard>
+            <MetricCard $bgColor={getScoreBgColor(orgAverages.friction, true, theme)}>
+              <ScoreValue $color={getScoreColor(orgAverages.friction, true)}>
                 {orgAverages.friction}
-              </div>
-              <div className="text-sm text-pearson-gray-600 mt-1">Friction</div>
-            </div>
-            <div className={clsx('card text-center', getScoreBgColor(orgAverages.safety))}>
-              <div className={clsx('text-3xl font-bold', getScoreColor(orgAverages.safety))}>
+              </ScoreValue>
+              <ScoreLabel>Friction</ScoreLabel>
+            </MetricCard>
+            <MetricCard $bgColor={getScoreBgColor(orgAverages.safety, false, theme)}>
+              <ScoreValue $color={getScoreColor(orgAverages.safety)}>
                 {orgAverages.safety}
-              </div>
-              <div className="text-sm text-pearson-gray-600 mt-1">Safety</div>
-            </div>
-            <div className={clsx('card text-center', getScoreBgColor(orgAverages.portfolio))}>
-              <div className={clsx('text-3xl font-bold', getScoreColor(orgAverages.portfolio))}>
+              </ScoreValue>
+              <ScoreLabel>Safety</ScoreLabel>
+            </MetricCard>
+            <MetricCard $bgColor={getScoreBgColor(orgAverages.portfolio, false, theme)}>
+              <ScoreValue $color={getScoreColor(orgAverages.portfolio)}>
                 {orgAverages.portfolio}
-              </div>
-              <div className="text-sm text-pearson-gray-600 mt-1">Portfolio Balance</div>
-            </div>
-            <div className="card text-center bg-pearson-gray-50">
-              <div className="text-3xl font-bold text-pearson-gray-800">
+              </ScoreValue>
+              <ScoreLabel>Portfolio Balance</ScoreLabel>
+            </MetricCard>
+            <MetricCard $bgColor={theme.v1.semanticColors.canvas.highlight.light}>
+              <ScoreValue $color={theme.v1.semanticColors.text.heading.bold}>
                 {orgAverages.totalResponses}
-              </div>
-              <div className="text-sm text-pearson-gray-600 mt-1">Total Responses</div>
-            </div>
-          </div>
+              </ScoreValue>
+              <ScoreLabel>Total Responses</ScoreLabel>
+            </MetricCard>
+          </MetricsGrid>
         </section>
       )}
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <ChartsGrid>
         {/* Team Comparison Bar Chart */}
-        <section className="card">
-          <h3 className="card-header">Team Comparison</h3>
-          {barChartData.length > 0 ? (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={barChartData}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
-                    width={40}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value: number, name: string) => [
-                      `${Math.round(value)}`,
-                      name,
-                    ]}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: 10 }} />
-                  <Bar dataKey="Flow" fill={METRIC_COLORS.flow} radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="Friction" fill={METRIC_COLORS.friction} radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="Safety" fill={METRIC_COLORS.safety} radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="Portfolio" fill={METRIC_COLORS.portfolio} radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-80 flex items-center justify-center text-pearson-gray-500">
-              <p>No team data available yet. Complete surveys to see comparisons.</p>
-            </div>
-          )}
+        <section>
+          <Card>
+            <CardTitle>Team Comparison</CardTitle>
+            {barChartData.length > 0 ? (
+              <ChartContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={barChartData}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.v1.semanticColors.border.divider.light} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: theme.v1.semanticColors.chart.label }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fontSize: 12, fill: theme.v1.semanticColors.chart.label }}
+                      width={40}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme.v1.semanticColors.canvas.default,
+                        border: `1px solid ${theme.v1.semanticColors.border.neutral.default}`,
+                        borderRadius: theme.v1.radius.radiusMD,
+                      }}
+                      formatter={(value: number, name: string) => [
+                        `${Math.round(value)}`,
+                        name,
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: 10 }} />
+                    <Bar dataKey="Flow" fill={METRIC_COLORS.flow} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="Friction" fill={METRIC_COLORS.friction} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="Safety" fill={METRIC_COLORS.safety} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="Portfolio" fill={METRIC_COLORS.portfolio} radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <EmptyChartState>
+                <p>No team data available yet. Complete surveys to see comparisons.</p>
+              </EmptyChartState>
+            )}
+          </Card>
         </section>
 
         {/* Organization Health Radar */}
-        <section className="card">
-          <h3 className="card-header">Organization Health</h3>
-          {radarData.length > 0 ? (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                  <PolarGrid stroke="#E5E7EB" />
-                  <PolarAngleAxis
-                    dataKey="metric"
-                    tick={{ fontSize: 12, fill: '#374151' }}
-                  />
-                  <PolarRadiusAxis
-                    angle={90}
-                    domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
-                  />
-                  <Radar
-                    name="Current"
-                    dataKey="value"
-                    stroke="#047857"
-                    fill="#047857"
-                    fillOpacity={0.3}
-                  />
-                  <Radar
-                    name="Benchmark"
-                    dataKey="benchmark"
-                    stroke="#9CA3AF"
-                    fill="#9CA3AF"
-                    fillOpacity={0.1}
-                    strokeDasharray="5 5"
-                  />
-                  <Legend />
-                  <Tooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-80 flex items-center justify-center text-pearson-gray-500">
-              <p>No organization data available yet.</p>
-            </div>
-          )}
-          <p className="text-xs text-pearson-gray-500 text-center mt-2">
-            Note: Friction is inverted (higher = less friction = better)
-          </p>
+        <section>
+          <Card>
+            <CardTitle>Organization Health</CardTitle>
+            {radarData.length > 0 ? (
+              <ChartContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                    <PolarGrid stroke={theme.v1.semanticColors.border.divider.light} />
+                    <PolarAngleAxis
+                      dataKey="metric"
+                      tick={{ fontSize: 12, fill: theme.v1.semanticColors.chart.subtitle }}
+                    />
+                    <PolarRadiusAxis
+                      angle={90}
+                      domain={[0, 100]}
+                      tick={{ fontSize: 10, fill: theme.v1.semanticColors.chart.label }}
+                    />
+                    <Radar
+                      name="Current"
+                      dataKey="value"
+                      stroke="#047857"
+                      fill="#047857"
+                      fillOpacity={0.3}
+                    />
+                    <Radar
+                      name="Benchmark"
+                      dataKey="benchmark"
+                      stroke={theme.v1.semanticColors.chart.label}
+                      fill={theme.v1.semanticColors.chart.label}
+                      fillOpacity={0.1}
+                      strokeDasharray="5 5"
+                    />
+                    <Legend />
+                    <Tooltip />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <EmptyChartState>
+                <p>No organization data available yet.</p>
+              </EmptyChartState>
+            )}
+            <ChartNote>
+              Note: Friction is inverted (higher = less friction = better)
+            </ChartNote>
+          </Card>
         </section>
-      </div>
+      </ChartsGrid>
 
       {/* Team Cards Grid */}
       <section>
-        <h2 className="text-lg font-semibold text-pearson-gray-800 mb-4">All Teams</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <SectionTitle>All Teams</SectionTitle>
+        <TeamsGrid>
           {teamsMetrics?.map((team) => (
-            <Link
+            <TeamCard
               key={team.team_id}
               to={`/teams/${team.team_id}`}
-              className="card hover:shadow-md transition-shadow"
             >
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-medium text-pearson-gray-800">{team.team_name}</h3>
-                  <p className="text-sm text-pearson-gray-500">{team.team_function}</p>
-                </div>
+              <TeamHeader>
+                <TeamInfo>
+                  <TeamName>{team.team_name}</TeamName>
+                  <TeamFunction>{team.team_function}</TeamFunction>
+                </TeamInfo>
                 {team.meets_privacy_threshold ? (
-                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
+                  <Badge $variant="success" $size="sm">
                     Active
-                  </span>
+                  </Badge>
                 ) : (
-                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                  <Badge $variant="warning" $size="sm">
                     {team.respondent_count}/7 responses
-                  </span>
+                  </Badge>
                 )}
-              </div>
+              </TeamHeader>
 
               {team.meets_privacy_threshold ? (
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  <div>
-                    <div className={clsx('text-lg font-bold', getScoreColor(team.flow_score))}>
+                <TeamMetricsGrid>
+                  <MetricItem>
+                    <TeamMetricValue $color={getScoreColor(team.flow_score)}>
                       {team.flow_score != null ? Math.round(team.flow_score) : '—'}
-                    </div>
-                    <div className="text-xs text-pearson-gray-500">Flow</div>
-                  </div>
-                  <div>
-                    <div className={clsx('text-lg font-bold', getScoreColor(team.friction_score, true))}>
+                    </TeamMetricValue>
+                    <TeamMetricLabel>Flow</TeamMetricLabel>
+                  </MetricItem>
+                  <MetricItem>
+                    <TeamMetricValue $color={getScoreColor(team.friction_score, true)}>
                       {team.friction_score != null ? Math.round(team.friction_score) : '—'}
-                    </div>
-                    <div className="text-xs text-pearson-gray-500">Friction</div>
-                  </div>
-                  <div>
-                    <div className={clsx('text-lg font-bold', getScoreColor(team.safety_score))}>
+                    </TeamMetricValue>
+                    <TeamMetricLabel>Friction</TeamMetricLabel>
+                  </MetricItem>
+                  <MetricItem>
+                    <TeamMetricValue $color={getScoreColor(team.safety_score)}>
                       {team.safety_score != null ? Math.round(team.safety_score) : '—'}
-                    </div>
-                    <div className="text-xs text-pearson-gray-500">Safety</div>
-                  </div>
-                  <div>
-                    <div className={clsx('text-lg font-bold', getScoreColor(team.portfolio_balance_score))}>
+                    </TeamMetricValue>
+                    <TeamMetricLabel>Safety</TeamMetricLabel>
+                  </MetricItem>
+                  <MetricItem>
+                    <TeamMetricValue $color={getScoreColor(team.portfolio_balance_score)}>
                       {team.portfolio_balance_score != null ? Math.round(team.portfolio_balance_score) : '—'}
-                    </div>
-                    <div className="text-xs text-pearson-gray-500">Portfolio</div>
-                  </div>
-                </div>
+                    </TeamMetricValue>
+                    <TeamMetricLabel>Portfolio</TeamMetricLabel>
+                  </MetricItem>
+                </TeamMetricsGrid>
               ) : (
-                <p className="text-sm text-pearson-gray-500 text-center py-4">
+                <AwaitingResponsesMessage>
                   Awaiting {7 - team.respondent_count} more responses for privacy threshold
-                </p>
+                </AwaitingResponsesMessage>
               )}
-            </Link>
+            </TeamCard>
           ))}
 
           {(!teamsMetrics || teamsMetrics.length === 0) && (
-            <div className="col-span-full text-center py-8 bg-white rounded-lg border border-pearson-gray-200">
-              <p className="text-pearson-gray-600">No teams configured yet.</p>
-              <Link to="/teams" className="text-pearson-blue hover:underline text-sm mt-2 inline-block">
+            <EmptyTeamsCard>
+              <Text $color="default">No teams configured yet.</Text>
+              <EmptyTeamsLink to="/teams">
                 Add teams to get started
-              </Link>
-            </div>
+              </EmptyTeamsLink>
+            </EmptyTeamsCard>
           )}
-        </div>
+        </TeamsGrid>
       </section>
 
       {/* Privacy Notice */}
-      <section className="card bg-pearson-gray-50 border-pearson-gray-200">
-        <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-pearson-gray-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h3 className="font-medium text-pearson-gray-700">Privacy Protection</h3>
-            <p className="text-sm text-pearson-gray-600 mt-1">
-              Team metrics are only displayed when at least 7 survey responses have been collected.
-              This ensures individual anonymity and prevents identification of specific respondents.
-              No individual-level data is ever exposed in this dashboard.
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
+      <PrivacyAlert>
+        <InfoIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </InfoIcon>
+        <PrivacyContent>
+          <PrivacyTitle>Privacy Protection</PrivacyTitle>
+          <PrivacyDescription>
+            Team metrics are only displayed when at least 7 survey responses have been collected.
+            This ensures individual anonymity and prevents identification of specific respondents.
+            No individual-level data is ever exposed in this dashboard.
+          </PrivacyDescription>
+        </PrivacyContent>
+      </PrivacyAlert>
+    </PageContainer>
   )
 }

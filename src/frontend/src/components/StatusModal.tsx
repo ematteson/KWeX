@@ -1,12 +1,445 @@
 import { useState } from 'react'
+import styled from 'styled-components'
 import { useSystemStatus, useTestLLM, useLLMConfig, useResetAll, useResetTasks, useResetOccupation, useDeleteOccupation, useSurveysForSampleData, useGenerateSampleData } from '../api/hooks'
 import type { LLMTestResult, LLMConfigResponse } from '../api/types'
 import { VERSION as FRONTEND_VERSION } from '../version'
+import {
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Heading,
+  Text,
+  Spinner,
+  Input,
+  Label,
+  Flex,
+  Grid,
+  Alert,
+} from '../design-system/components'
 
 interface StatusModalProps {
   isOpen: boolean
   onClose: () => void
 }
+
+// Styled components for StatusModal
+const HeaderWrapper = styled.div`
+  flex: 1;
+`
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS};
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  transition: color 0.2s;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  }
+`
+
+const ScrollableBody = styled(ModalBody)`
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(90vh - 200px);
+`
+
+const Section = styled.section`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const SectionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const VersionSection = styled.section`
+  background: linear-gradient(to right, ${({ theme }) => theme.v1.semanticColors.fill.highlight.brand.default}, ${({ theme }) => theme.v1.colors.primary[25]});
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const InfoBox = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const InfoItem = styled.div``
+
+const InfoLabel = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0;
+`
+
+const InfoValue = styled.p<{ $color?: 'default' | 'success' | 'warning' | 'error' | 'subtle' }>`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  margin: 0;
+  color: ${({ theme, $color }) => {
+    switch ($color) {
+      case 'success': return theme.v1.semanticColors.text.feedback.success.vibrant
+      case 'warning': return theme.v1.semanticColors.text.feedback.warning.default
+      case 'error': return theme.v1.semanticColors.text.feedback.error.vibrant
+      case 'subtle': return theme.v1.semanticColors.text.body.subtle
+      default: return theme.v1.semanticColors.text.body.bold
+    }
+  }};
+`
+
+const MonoText = styled.span`
+  font-family: monospace;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const SmallMonoText = styled.p`
+  font-family: monospace;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const StatusDot = styled.span<{ $status: 'success' | 'warning' | 'error' | 'neutral' }>`
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  background-color: ${({ theme, $status }) => {
+    switch ($status) {
+      case 'success': return theme.v1.semanticColors.fill.feedback.success.bold
+      case 'warning': return theme.v1.semanticColors.fill.feedback.warning.bold
+      case 'error': return theme.v1.semanticColors.fill.feedback.error.bold
+      default: return theme.v1.semanticColors.fill.neutral.dark
+    }
+  }};
+`
+
+const SmallStatusDot = styled(StatusDot)`
+  width: 8px;
+  height: 8px;
+`
+
+const StatCardContainer = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  text-align: center;
+`
+
+const StatValue = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const StatLabel = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0;
+`
+
+const DangerSection = styled.section`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.orange.subtle};
+  border: 1px solid ${({ theme }) => theme.v1.colors.status.orange[25]};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const PurpleSection = styled.section`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.help.subtle};
+  border: 1px solid ${({ theme }) => theme.v1.colors.status.purple[25]};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ConfirmBox = styled.div<{ $variant: 'danger' | 'warning' }>`
+  background-color: ${({ theme, $variant }) =>
+    $variant === 'danger'
+      ? theme.v1.semanticColors.fill.feedback.error.subtle
+      : theme.v1.semanticColors.fill.feedback.warning.subtle};
+  border: 1px solid ${({ theme, $variant }) =>
+    $variant === 'danger'
+      ? theme.v1.semanticColors.border.feedback.error
+      : theme.v1.semanticColors.border.feedback.warning};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ConfirmTitle = styled.p<{ $variant: 'danger' | 'warning' }>`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme, $variant }) =>
+    $variant === 'danger'
+      ? theme.v1.semanticColors.text.feedback.error.default
+      : theme.v1.semanticColors.text.feedback.warning.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const ConfirmText = styled.p<{ $variant: 'danger' | 'warning' }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme, $variant }) =>
+    $variant === 'danger'
+      ? theme.v1.semanticColors.text.feedback.error.default
+      : theme.v1.semanticColors.text.feedback.warning.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const EnvVarRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  font-family: monospace;
+`
+
+const EnvVarKey = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const EnvVarValue = styled.span<{ $active?: boolean }>`
+  color: ${({ theme, $active }) =>
+    $active ? theme.v1.semanticColors.text.feedback.success.vibrant : theme.v1.semanticColors.text.body.default};
+`
+
+const CodeBlock = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const DiagnosticResult = styled.div<{ $success: boolean }>`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  background-color: ${({ theme, $success }) =>
+    $success ? theme.v1.semanticColors.fill.feedback.success.subtle : theme.v1.semanticColors.fill.feedback.error.subtle};
+  border: 1px solid ${({ theme, $success }) =>
+    $success ? theme.v1.semanticColors.border.feedback.success : theme.v1.semanticColors.border.feedback.error};
+`
+
+const DiagnosticResultTitle = styled.p<{ $success: boolean }>`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme, $success }) =>
+    $success ? theme.v1.semanticColors.text.feedback.success.default : theme.v1.semanticColors.text.feedback.error.default};
+  margin: 0;
+`
+
+const ConfigBox = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  max-height: 256px;
+  overflow-y: auto;
+`
+
+const ConfigSubsection = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const ConfigSubsectionLabel = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingXS} 0;
+`
+
+const WhyMockBox = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.subtle};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  margin: 0;
+`
+
+const Divider = styled.div`
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const OperationRow = styled.div<{ $success?: boolean }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} 0;
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+  color: ${({ theme, $success }) =>
+    $success === false ? theme.v1.semanticColors.text.feedback.error.vibrant : theme.v1.semanticColors.text.body.default};
+`
+
+const Select = styled.select`
+  width: 100%;
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingMD};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.inputs.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.v1.semanticColors.border.inputs.typing};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.v1.semanticColors.fill.highlight.brand.default};
+  }
+`
+
+const NumberInput = styled(Input)`
+  width: 100%;
+`
+
+const ModeDescription = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const Table = styled.table`
+  width: 100%;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const TableHeader = styled.thead`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+`
+
+const TableHeaderCell = styled.th`
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingLG};
+  text-align: left;
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.subtle};
+`
+
+const TableRow = styled.tr`
+  &:hover {
+    background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  }
+`
+
+const TableCell = styled.td`
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const TableCellCenter = styled(TableCell)`
+  text-align: center;
+`
+
+const ActionButtonSmall = styled.button<{ $variant: 'warning' | 'danger' }>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.2s;
+
+  ${({ theme, $variant }) =>
+    $variant === 'warning'
+      ? `
+        background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+        color: ${theme.v1.semanticColors.text.feedback.warning.default};
+        &:hover:not(:disabled) {
+          background-color: ${theme.v1.colors.status.yellow[25]};
+        }
+      `
+      : `
+        background-color: ${theme.v1.semanticColors.fill.feedback.error.subtle};
+        color: ${theme.v1.semanticColors.text.feedback.error.default};
+        &:hover:not(:disabled) {
+          background-color: ${theme.v1.colors.status.red[25]};
+        }
+      `}
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const LoadingContainer = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+`
+
+const ErrorContainer = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.vibrant};
+`
+
+const RetryLink = styled.button`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+`
+
+const FooterContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+`
+
+const RefreshButton = styled.button`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  background: none;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const MessageAlert = styled(Alert)<{ $isSuccess: boolean }>`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const DismissButton = styled.button`
+  background: none;
+  border: none;
+  margin-left: ${({ theme }) => theme.v1.spacing.spacingSM};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  cursor: pointer;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  }
+`
 
 export function StatusModal({ isOpen, onClose }: StatusModalProps) {
   const { data: status, isLoading, error, refetch } = useSystemStatus()
@@ -101,493 +534,442 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <ModalOverlay>
+      <ModalContent $size="lg" style={{ display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div className="p-6 border-b flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-semibold">System Status</h2>
-            <p className="text-sm text-gray-500">Faethm integration and database overview</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <ModalHeader>
+          <HeaderWrapper>
+            <Heading $level={3}>System Status</Heading>
+            <Text $variant="bodySmall" $color="subtle">Faethm integration and database overview</Text>
+          </HeaderWrapper>
+          <CloseButton onClick={onClose}>
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
-        </div>
+          </CloseButton>
+        </ModalHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <ScrollableBody>
           {isLoading ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600">Loading status...</p>
-            </div>
+            <LoadingContainer>
+              <Spinner $size="lg" />
+              <Text $color="subtle" style={{ marginTop: '0.5rem' }}>Loading status...</Text>
+            </LoadingContainer>
           ) : error ? (
-            <div className="text-center py-8 text-red-600">
-              <p>Failed to load status</p>
-              <button
-                onClick={() => refetch()}
-                className="mt-2 text-blue-600 hover:underline"
-              >
-                Retry
-              </button>
-            </div>
+            <ErrorContainer>
+              <Text $color="error">Failed to load status</Text>
+              <RetryLink onClick={() => refetch()}>Retry</RetryLink>
+            </ErrorContainer>
           ) : status ? (
-            <div className="space-y-6">
+            <>
               {/* Version Info */}
-              <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
-                <div className="flex justify-between items-center">
+              <VersionSection>
+                <Flex $justify="between" $align="center">
                   <div>
-                    <h3 className="font-semibold text-gray-900">KWeX {status.version?.backend_name || ''}</h3>
-                    <p className="text-sm text-gray-600">
+                    <Heading $level={4}>KWeX {status.version?.backend_name || ''}</Heading>
+                    <Text $variant="bodySmall" $color="subtle">
                       Backend: v{status.version?.backend || 'unknown'} | Frontend: v{FRONTEND_VERSION}
-                    </p>
+                    </Text>
                   </div>
-                  <div className="text-right text-sm text-gray-500">
-                    <p>{status.environment}</p>
-                    <p>{status.version?.backend_build_date}</p>
+                  <div style={{ textAlign: 'right' }}>
+                    <Text $variant="bodySmall" $color="subtle">{status.environment}</Text>
+                    <Text $variant="bodySmall" $color="subtle">{status.version?.backend_build_date}</Text>
                   </div>
-                </div>
-              </section>
+                </Flex>
+              </VersionSection>
 
               {/* Faethm Connection Status */}
-              <section>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <span className={`w-3 h-3 rounded-full ${
-                    status.faethm.mode === 'live' ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}></span>
+              <Section>
+                <SectionTitle>
+                  <StatusDot $status={status.faethm.mode === 'live' ? 'success' : 'warning'} />
                   Faethm Integration
-                </h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Mode</p>
-                      <p className={`font-semibold ${
-                        status.faethm.mode === 'live' ? 'text-green-600' : 'text-yellow-600'
-                      }`}>
+                </SectionTitle>
+                <InfoBox>
+                  <InfoGrid>
+                    <InfoItem>
+                      <InfoLabel>Mode</InfoLabel>
+                      <InfoValue $color={status.faethm.mode === 'live' ? 'success' : 'warning'}>
                         {status.faethm.mode === 'live' ? 'Live API' : 'Mock Data (CSV)'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">API Key</p>
-                      <p className={`font-semibold ${
-                        status.faethm.api_key_configured ? 'text-green-600' : 'text-gray-400'
-                      }`}>
+                      </InfoValue>
+                    </InfoItem>
+                    <InfoItem>
+                      <InfoLabel>API Key</InfoLabel>
+                      <InfoValue $color={status.faethm.api_key_configured ? 'success' : 'subtle'}>
                         {status.faethm.api_key_configured ? 'Configured (FaethmPROD)' : 'Not Configured'}
-                      </p>
-                    </div>
-                  </div>
+                      </InfoValue>
+                    </InfoItem>
+                  </InfoGrid>
 
                   {status.faethm.mode === 'live' && status.faethm.api_url && (
-                    <div>
-                      <p className="text-sm text-gray-500">API URL</p>
-                      <p className="font-mono text-sm">{status.faethm.api_url}</p>
-                    </div>
+                    <InfoItem style={{ marginTop: '1rem' }}>
+                      <InfoLabel>API URL</InfoLabel>
+                      <SmallMonoText>{status.faethm.api_url}</SmallMonoText>
+                    </InfoItem>
                   )}
 
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">CSV Data Source</p>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        status.faethm.csv_exists ? 'bg-green-500' : 'bg-red-500'
-                      }`}></span>
-                      <p className="font-mono text-sm truncate">{status.faethm.csv_path}</p>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
+                  <Divider>
+                    <InfoLabel>CSV Data Source</InfoLabel>
+                    <Flex $align="center" $gap="spacingSM">
+                      <SmallStatusDot $status={status.faethm.csv_exists ? 'success' : 'error'} />
+                      <SmallMonoText style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{status.faethm.csv_path}</SmallMonoText>
+                    </Flex>
+                    <Text $variant="bodySmall" $color="subtle" style={{ marginTop: '0.25rem' }}>
                       {status.faethm.csv_occupations_count.toLocaleString()} occupations available
-                    </p>
-                  </div>
-                </div>
-              </section>
+                    </Text>
+                  </Divider>
+                </InfoBox>
+              </Section>
 
               {/* Database Statistics */}
-              <section>
-                <h3 className="text-lg font-semibold mb-3">Database Statistics</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <StatCard
-                    label="Occupations Synced"
-                    value={status.database.occupations_synced}
-                    icon="briefcase"
-                  />
-                  <StatCard
-                    label="Tasks"
-                    value={status.database.tasks_count}
-                    icon="clipboard"
-                  />
-                  <StatCard
-                    label="Teams"
-                    value={status.database.teams_count}
-                    icon="users"
-                  />
-                  <StatCard
-                    label="Surveys"
-                    value={status.database.surveys_count}
-                    icon="document"
-                  />
-                  <StatCard
-                    label="Questions"
-                    value={status.database.questions_count}
-                    icon="question"
-                  />
-                  <StatCard
-                    label="Responses"
-                    value={status.database.responses_count}
-                    icon="check"
-                  />
-                </div>
-              </section>
+              <Section>
+                <SectionTitle>Database Statistics</SectionTitle>
+                <Grid $columns={3} $gap="spacingMD">
+                  <StatCard label="Occupations Synced" value={status.database.occupations_synced} icon="briefcase" />
+                  <StatCard label="Tasks" value={status.database.tasks_count} icon="clipboard" />
+                  <StatCard label="Teams" value={status.database.teams_count} icon="users" />
+                  <StatCard label="Surveys" value={status.database.surveys_count} icon="document" />
+                  <StatCard label="Questions" value={status.database.questions_count} icon="question" />
+                  <StatCard label="Responses" value={status.database.responses_count} icon="check" />
+                </Grid>
+              </Section>
 
               {/* Configuration */}
-              <section>
-                <h3 className="text-lg font-semibold mb-3">Configuration</h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-500">Environment</p>
-                      <p className="font-semibold capitalize">{status.environment}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Privacy Threshold</p>
-                      <p className="font-semibold">{status.privacy_threshold} responses</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Max Survey Duration</p>
-                      <p className="font-semibold">{status.max_survey_minutes} minutes</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Last Updated</p>
-                      <p className="font-semibold">{new Date(status.timestamp).toLocaleTimeString()}</p>
-                    </div>
-                  </div>
-                </div>
-              </section>
+              <Section>
+                <SectionTitle>Configuration</SectionTitle>
+                <InfoBox>
+                  <InfoGrid>
+                    <InfoItem>
+                      <InfoLabel>Environment</InfoLabel>
+                      <InfoValue style={{ textTransform: 'capitalize' }}>{status.environment}</InfoValue>
+                    </InfoItem>
+                    <InfoItem>
+                      <InfoLabel>Privacy Threshold</InfoLabel>
+                      <InfoValue>{status.privacy_threshold} responses</InfoValue>
+                    </InfoItem>
+                    <InfoItem>
+                      <InfoLabel>Max Survey Duration</InfoLabel>
+                      <InfoValue>{status.max_survey_minutes} minutes</InfoValue>
+                    </InfoItem>
+                    <InfoItem>
+                      <InfoLabel>Last Updated</InfoLabel>
+                      <InfoValue>{new Date(status.timestamp).toLocaleTimeString()}</InfoValue>
+                    </InfoItem>
+                  </InfoGrid>
+                </InfoBox>
+              </Section>
 
               {/* LLM Status */}
               {status.llm && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${
-                      status.llm.mock_setting ? 'bg-yellow-500' :
-                      (status.llm.claude.available || status.llm.gpt.available) ? 'bg-green-500' : 'bg-red-500'
-                    }`}></span>
+                <Section>
+                  <SectionTitle>
+                    <StatusDot
+                      $status={
+                        status.llm.mock_setting
+                          ? 'warning'
+                          : status.llm.claude.available || status.llm.gpt.available
+                          ? 'success'
+                          : 'error'
+                      }
+                    />
                     LLM Integration
-                  </h3>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  </SectionTitle>
+                  <InfoBox>
                     {/* Mode and Model */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500">Mode</p>
-                        <p className={`font-semibold ${status.llm.mock_setting ? 'text-yellow-600' : 'text-green-600'}`}>
+                    <InfoGrid>
+                      <InfoItem>
+                        <InfoLabel>Mode</InfoLabel>
+                        <InfoValue $color={status.llm.mock_setting ? 'warning' : 'success'}>
                           {status.llm.mock_setting ? 'Mock (Development)' : 'Live'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Default Model</p>
-                        <p className="font-semibold capitalize">{status.llm.default_model}</p>
-                      </div>
-                    </div>
+                        </InfoValue>
+                      </InfoItem>
+                      <InfoItem>
+                        <InfoLabel>Default Model</InfoLabel>
+                        <InfoValue style={{ textTransform: 'capitalize' }}>{status.llm.default_model}</InfoValue>
+                      </InfoItem>
+                    </InfoGrid>
 
                     {/* Claude Endpoint */}
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          status.llm.claude.available ? 'bg-green-500' :
-                          status.llm.claude.api_key_configured ? 'bg-yellow-500' : 'bg-gray-400'
-                        }`}></span>
-                        <p className="text-sm font-medium">{status.llm.claude.name}</p>
-                      </div>
-                      <div className="text-sm text-gray-600 ml-4">
-                        <p>Configured: {status.llm.claude.api_key_configured ? 'Yes' : 'No'}</p>
-                        <p>Deployment: {status.llm.claude.deployment}</p>
+                    <Divider>
+                      <Flex $align="center" $gap="spacingSM" style={{ marginBottom: '0.5rem' }}>
+                        <SmallStatusDot
+                          $status={
+                            status.llm.claude.available
+                              ? 'success'
+                              : status.llm.claude.api_key_configured
+                              ? 'warning'
+                              : 'neutral'
+                          }
+                        />
+                        <Text $variant="bodySmall" $weight="semibold">{status.llm.claude.name}</Text>
+                      </Flex>
+                      <div style={{ marginLeft: '1rem' }}>
+                        <Text $variant="bodySmall" $color="subtle">Configured: {status.llm.claude.api_key_configured ? 'Yes' : 'No'}</Text>
+                        <Text $variant="bodySmall" $color="subtle">Deployment: {status.llm.claude.deployment}</Text>
                         {status.llm.claude.endpoint && (
-                          <p className="font-mono text-xs truncate">{status.llm.claude.endpoint}</p>
+                          <SmallMonoText style={{ color: 'inherit' }}>{status.llm.claude.endpoint}</SmallMonoText>
                         )}
-                        <p>API Key: {status.llm.claude.api_key_preview}</p>
+                        <Text $variant="bodySmall" $color="subtle">API Key: {status.llm.claude.api_key_preview}</Text>
                       </div>
-                    </div>
+                    </Divider>
 
                     {/* GPT Endpoint */}
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          status.llm.gpt.available ? 'bg-green-500' :
-                          status.llm.gpt.api_key_configured ? 'bg-yellow-500' : 'bg-gray-400'
-                        }`}></span>
-                        <p className="text-sm font-medium">{status.llm.gpt.name}</p>
-                      </div>
-                      <div className="text-sm text-gray-600 ml-4">
-                        <p>Configured: {status.llm.gpt.api_key_configured ? 'Yes' : 'No'}</p>
-                        <p>Deployment: {status.llm.gpt.deployment}</p>
+                    <Divider>
+                      <Flex $align="center" $gap="spacingSM" style={{ marginBottom: '0.5rem' }}>
+                        <SmallStatusDot
+                          $status={
+                            status.llm.gpt.available
+                              ? 'success'
+                              : status.llm.gpt.api_key_configured
+                              ? 'warning'
+                              : 'neutral'
+                          }
+                        />
+                        <Text $variant="bodySmall" $weight="semibold">{status.llm.gpt.name}</Text>
+                      </Flex>
+                      <div style={{ marginLeft: '1rem' }}>
+                        <Text $variant="bodySmall" $color="subtle">Configured: {status.llm.gpt.api_key_configured ? 'Yes' : 'No'}</Text>
+                        <Text $variant="bodySmall" $color="subtle">Deployment: {status.llm.gpt.deployment}</Text>
                         {status.llm.gpt.endpoint && (
-                          <p className="font-mono text-xs truncate">{status.llm.gpt.endpoint}</p>
+                          <SmallMonoText style={{ color: 'inherit' }}>{status.llm.gpt.endpoint}</SmallMonoText>
                         )}
-                        <p>API Key: {status.llm.gpt.api_key_preview}</p>
+                        <Text $variant="bodySmall" $color="subtle">API Key: {status.llm.gpt.api_key_preview}</Text>
                       </div>
-                    </div>
+                    </Divider>
 
                     {/* Environment Variables */}
-                    <div className="border-t border-gray-200 pt-3">
-                      <p className="text-sm font-medium mb-2">Environment Variables</p>
-                      <div className="text-xs font-mono space-y-1">
+                    <Divider>
+                      <Text $variant="bodySmall" $weight="semibold" style={{ marginBottom: '0.5rem' }}>Environment Variables</Text>
+                      <div style={{ fontFamily: 'monospace' }}>
                         {Object.entries(status.llm.env_vars).map(([key, value]) => (
-                          <div key={key} className="flex justify-between">
-                            <span className="text-gray-500">{key}:</span>
-                            <span className={value === 'set' || value.includes('true') ? 'text-green-600' : 'text-gray-600'}>{value}</span>
-                          </div>
+                          <EnvVarRow key={key}>
+                            <EnvVarKey>{key}:</EnvVarKey>
+                            <EnvVarValue $active={value === 'set' || value.includes('true')}>{value}</EnvVarValue>
+                          </EnvVarRow>
                         ))}
                       </div>
-                    </div>
+                    </Divider>
 
                     {/* Stats */}
                     {status.llm_stats && (
-                      <div className="border-t border-gray-200 pt-3">
-                        <p className="text-sm font-medium mb-2">Statistics</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>Total Calls: {status.llm_stats.total_llm_calls}</div>
-                          <div>Successful: {status.llm_stats.successful_calls}</div>
-                          <div>Failed: {status.llm_stats.failed_calls}</div>
-                          <div>Cached Templates: {status.llm_stats.cached_templates_count}</div>
-                          <div>Enriched Tasks: {status.llm_stats.enriched_tasks_count}</div>
-                        </div>
+                      <Divider>
+                        <Text $variant="bodySmall" $weight="semibold" style={{ marginBottom: '0.5rem' }}>Statistics</Text>
+                        <Grid $columns={2} $gap="spacingSM">
+                          <Text $variant="bodySmall">Total Calls: {status.llm_stats.total_llm_calls}</Text>
+                          <Text $variant="bodySmall">Successful: {status.llm_stats.successful_calls}</Text>
+                          <Text $variant="bodySmall">Failed: {status.llm_stats.failed_calls}</Text>
+                          <Text $variant="bodySmall">Cached Templates: {status.llm_stats.cached_templates_count}</Text>
+                          <Text $variant="bodySmall">Enriched Tasks: {status.llm_stats.enriched_tasks_count}</Text>
+                        </Grid>
                         {status.llm_stats.recent_operations.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium">Recent Operations:</p>
-                            <div className="max-h-32 overflow-y-auto">
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <Text $variant="bodySmall" $weight="semibold">Recent Operations:</Text>
+                            <div style={{ maxHeight: '128px', overflowY: 'auto' }}>
                               {status.llm_stats.recent_operations.slice(0, 5).map((op) => (
-                                <div key={op.id} className={`text-xs py-1 border-b border-gray-100 ${op.success ? '' : 'text-red-600'}`}>
-                                  <span className="font-medium">{op.operation}</span>
-                                  <span className="text-gray-500"> - {op.model}</span>
-                                  {op.latency_ms && <span className="text-gray-400"> ({op.latency_ms}ms)</span>}
-                                  {op.error && <div className="text-red-500 truncate">{op.error}</div>}
-                                </div>
+                                <OperationRow key={op.id} $success={op.success}>
+                                  <span style={{ fontWeight: 600 }}>{op.operation}</span>
+                                  <span style={{ color: 'inherit', opacity: 0.7 }}> - {op.model}</span>
+                                  {op.latency_ms && <span style={{ opacity: 0.5 }}> ({op.latency_ms}ms)</span>}
+                                  {op.error && <div style={{ marginTop: '0.25rem' }}>{op.error}</div>}
+                                </OperationRow>
                               ))}
                             </div>
                           </div>
                         )}
-                      </div>
+                      </Divider>
                     )}
 
                     {/* Test Buttons */}
-                    <div className="border-t border-gray-200 pt-3">
-                      <p className="text-sm font-medium mb-2">Diagnostics</p>
-                      <div className="flex gap-2">
-                        <button
+                    <Divider>
+                      <Text $variant="bodySmall" $weight="semibold" style={{ marginBottom: '0.5rem' }}>Diagnostics</Text>
+                      <Flex $gap="spacingSM">
+                        <Button
+                          $size="sm"
                           onClick={async () => {
                             setLLMTestResult(null)
                             const result = await testLLM.mutateAsync(undefined)
                             setLLMTestResult(result)
                           }}
                           disabled={testLLM.isPending}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                           {testLLM.isPending ? 'Testing...' : 'Test LLM Connection'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          $size="sm"
+                          $variant="secondary"
                           onClick={async () => {
                             setLLMConfig(null)
                             const result = await getLLMConfig.mutateAsync()
                             setLLMConfig(result)
                           }}
                           disabled={getLLMConfig.isPending}
-                          className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 disabled:opacity-50"
                         >
                           {getLLMConfig.isPending ? 'Loading...' : 'View Config'}
-                        </button>
-                      </div>
+                        </Button>
+                      </Flex>
 
                       {/* Test Result */}
                       {llmTestResult && (
-                        <div className={`mt-3 p-3 rounded text-sm ${
-                          llmTestResult.test_result?.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                        }`}>
-                          <p className={`font-medium ${llmTestResult.test_result?.success ? 'text-green-700' : 'text-red-700'}`}>
+                        <DiagnosticResult $success={!!llmTestResult.test_result?.success}>
+                          <DiagnosticResultTitle $success={!!llmTestResult.test_result?.success}>
                             {llmTestResult.test_result?.success ? 'Success!' : 'Failed'}
-                          </p>
+                          </DiagnosticResultTitle>
                           {llmTestResult.client && (
-                            <p className="text-gray-700">Client: {llmTestResult.client.type} ({llmTestResult.client.model_name})</p>
+                            <Text $variant="bodySmall">Client: {llmTestResult.client.type} ({llmTestResult.client.model_name})</Text>
                           )}
                           {llmTestResult.test_result?.response && (
-                            <p className="text-gray-700 mt-1">Response: {llmTestResult.test_result.response}</p>
+                            <Text $variant="bodySmall" style={{ marginTop: '0.25rem' }}>Response: {llmTestResult.test_result.response}</Text>
                           )}
                           {llmTestResult.test_result?.latency_ms && (
-                            <p className="text-gray-600">Latency: {llmTestResult.test_result.latency_ms}ms</p>
+                            <Text $variant="bodySmall" $color="subtle">Latency: {llmTestResult.test_result.latency_ms}ms</Text>
                           )}
                           {llmTestResult.error && (
-                            <p className="text-red-600 mt-1">{llmTestResult.error}</p>
+                            <Text $variant="bodySmall" $color="error" style={{ marginTop: '0.25rem' }}>{llmTestResult.error}</Text>
                           )}
-                        </div>
+                        </DiagnosticResult>
                       )}
 
                       {/* Config Details */}
                       {llmConfig && (
-                        <div className="mt-3 p-3 bg-gray-100 rounded text-sm max-h-64 overflow-y-auto">
-                          <p className="font-medium mb-2">Configuration Details</p>
+                        <ConfigBox>
+                          <Text $variant="bodySmall" $weight="semibold" style={{ marginBottom: '0.5rem' }}>Configuration Details</Text>
 
-                          <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Why Mock Mode?</p>
-                            <p className="text-sm bg-yellow-50 p-2 rounded">{llmConfig.why_mock_mode}</p>
-                          </div>
+                          <ConfigSubsection>
+                            <ConfigSubsectionLabel>Why Mock Mode?</ConfigSubsectionLabel>
+                            <WhyMockBox>{llmConfig.why_mock_mode}</WhyMockBox>
+                          </ConfigSubsection>
 
-                          <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">.env File ({llmConfig.env_file_exists ? 'Found' : 'Not Found'})</p>
-                            <p className="font-mono text-xs text-gray-600 truncate">{llmConfig.env_file_path}</p>
+                          <ConfigSubsection>
+                            <ConfigSubsectionLabel>.env File ({llmConfig.env_file_exists ? 'Found' : 'Not Found'})</ConfigSubsectionLabel>
+                            <SmallMonoText style={{ color: 'inherit' }}>{llmConfig.env_file_path}</SmallMonoText>
                             {Object.keys(llmConfig.env_file_llm_vars).length > 0 && (
-                              <div className="mt-1 text-xs font-mono bg-white p-2 rounded">
+                              <CodeBlock>
                                 {Object.entries(llmConfig.env_file_llm_vars).map(([key, value]) => (
-                                  <div key={key}>{key}={value}</div>
+                                  <SmallMonoText key={key}>{key}={value}</SmallMonoText>
                                 ))}
-                              </div>
+                              </CodeBlock>
                             )}
-                          </div>
+                          </ConfigSubsection>
 
-                          <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Loaded Settings</p>
-                            <div className="text-xs font-mono bg-white p-2 rounded">
+                          <ConfigSubsection>
+                            <ConfigSubsectionLabel>Loaded Settings</ConfigSubsectionLabel>
+                            <CodeBlock>
                               {Object.entries(llmConfig.loaded_settings).map(([key, value]) => (
-                                <div key={key}>{key}: {String(value)}</div>
+                                <SmallMonoText key={key}>{key}: {String(value)}</SmallMonoText>
                               ))}
-                            </div>
-                          </div>
+                            </CodeBlock>
+                          </ConfigSubsection>
 
-                          <div>
-                            <p className="text-xs font-medium text-gray-500 mb-1">OS Environment</p>
-                            <div className="text-xs font-mono bg-white p-2 rounded">
+                          <ConfigSubsection>
+                            <ConfigSubsectionLabel>OS Environment</ConfigSubsectionLabel>
+                            <CodeBlock>
                               {Object.entries(llmConfig.os_environ_llm_vars).map(([key, value]) => (
-                                <div key={key} className={value === 'set' ? 'text-green-600' : 'text-gray-500'}>
+                                <SmallMonoText key={key} style={{ color: value === 'set' ? '#1C826A' : 'inherit' }}>
                                   {key}: {value}
-                                </div>
+                                </SmallMonoText>
                               ))}
-                            </div>
-                          </div>
-                        </div>
+                            </CodeBlock>
+                          </ConfigSubsection>
+                        </ConfigBox>
                       )}
-                    </div>
-                  </div>
-                </section>
+                    </Divider>
+                  </InfoBox>
+                </Section>
               )}
 
               {/* Data Management */}
-              <section>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+              <Section>
+                <SectionTitle>
+                  <StatusDot $status="warning" />
                   Data Management (Development)
-                </h3>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                </SectionTitle>
+                <DangerSection>
                   {resetMessage && (
-                    <div className={`mb-4 p-3 rounded text-sm ${
-                      resetMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
-                    }`}>
+                    <MessageAlert $variant={resetMessage.type === 'success' ? 'success' : 'error'} $isSuccess={resetMessage.type === 'success'}>
                       {resetMessage.text}
-                      <button onClick={() => setResetMessage(null)} className="ml-2 text-gray-500 hover:text-gray-700">&times;</button>
-                    </div>
+                      <DismissButton onClick={() => setResetMessage(null)}>&times;</DismissButton>
+                    </MessageAlert>
                   )}
 
                   {confirmingReset === 'all' ? (
-                    <div className="bg-red-100 border border-red-300 rounded-lg p-4">
-                      <p className="text-red-800 font-medium mb-2">Confirm Full Database Reset</p>
-                      <p className="text-red-700 text-sm mb-4">
+                    <ConfirmBox $variant="danger">
+                      <ConfirmTitle $variant="danger">Confirm Full Database Reset</ConfirmTitle>
+                      <ConfirmText $variant="danger">
                         This will delete ALL data: occupations, tasks, teams, surveys, questions, responses, and opportunities. This cannot be undone.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleResetAll}
-                          disabled={resetAll.isPending}
-                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                        >
+                      </ConfirmText>
+                      <Flex $gap="spacingSM">
+                        <Button $variant="danger" onClick={handleResetAll} disabled={resetAll.isPending}>
                           {resetAll.isPending ? 'Resetting...' : 'Yes, Reset Everything'}
-                        </button>
-                        <button
-                          onClick={() => setConfirmingReset(null)}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        >
+                        </Button>
+                        <Button $variant="secondary" onClick={() => setConfirmingReset(null)}>
                           Cancel
-                        </button>
-                      </div>
-                    </div>
+                        </Button>
+                      </Flex>
+                    </ConfirmBox>
                   ) : confirmingReset === 'tasks' ? (
-                    <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4">
-                      <p className="text-yellow-800 font-medium mb-2">Confirm Task Reset</p>
-                      <p className="text-yellow-700 text-sm mb-4">
+                    <ConfirmBox $variant="warning">
+                      <ConfirmTitle $variant="warning">Confirm Task Reset</ConfirmTitle>
+                      <ConfirmText $variant="warning">
                         This will delete all task assignments and global tasks. Occupations, teams, and surveys will remain.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleResetTasks}
-                          disabled={resetTasks.isPending}
-                          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
-                        >
+                      </ConfirmText>
+                      <Flex $gap="spacingSM">
+                        <Button style={{ backgroundColor: '#F0B400', color: '#fff' }} onClick={handleResetTasks} disabled={resetTasks.isPending}>
                           {resetTasks.isPending ? 'Resetting...' : 'Yes, Reset Tasks'}
-                        </button>
-                        <button
-                          onClick={() => setConfirmingReset(null)}
-                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        >
+                        </Button>
+                        <Button $variant="secondary" onClick={() => setConfirmingReset(null)}>
                           Cancel
-                        </button>
-                      </div>
-                    </div>
+                        </Button>
+                      </Flex>
+                    </ConfirmBox>
                   ) : (
-                    <div className="space-y-4">
-                      <p className="text-sm text-orange-800">
+                    <div>
+                      <Text $variant="bodySmall" style={{ color: '#85421C', marginBottom: '1rem' }}>
                         Use these options to reset data during development. All actions require confirmation.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setConfirmingReset('all')}
-                          className="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                        >
+                      </Text>
+                      <Flex $gap="spacingSM" $wrap>
+                        <Button $variant="danger" $size="sm" onClick={() => setConfirmingReset('all')}>
                           Reset All Data
-                        </button>
-                        <button
-                          onClick={() => setConfirmingReset('tasks')}
-                          className="px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
-                        >
+                        </Button>
+                        <Button $size="sm" style={{ backgroundColor: '#F0B400', color: '#fff' }} onClick={() => setConfirmingReset('tasks')}>
                           Reset Tasks Only
-                        </button>
-                      </div>
+                        </Button>
+                      </Flex>
                     </div>
                   )}
-                </div>
-              </section>
+                </DangerSection>
+              </Section>
 
               {/* Sample Data Generation */}
-              <section>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+              <Section>
+                <SectionTitle>
+                  <StatusDot $status="neutral" style={{ backgroundColor: '#5B4599' }} />
                   Sample Data Generation
-                </h3>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                </SectionTitle>
+                <PurpleSection>
                   {sampleDataResult && (
-                    <div className={`mb-4 p-3 rounded text-sm ${
-                      sampleDataResult.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
-                    }`}>
+                    <MessageAlert $variant={sampleDataResult.type === 'success' ? 'success' : 'error'} $isSuccess={sampleDataResult.type === 'success'}>
                       <div>{sampleDataResult.text}</div>
                       {sampleDataResult.personas && sampleDataResult.personas.length > 0 && (
-                        <div className="mt-2 text-xs">
+                        <Text $variant="helper" style={{ marginTop: '0.5rem' }}>
                           Personas used: {sampleDataResult.personas.join(', ')}
-                        </div>
+                        </Text>
                       )}
-                      <button onClick={() => setSampleDataResult(null)} className="ml-2 text-gray-500 hover:text-gray-700">&times;</button>
-                    </div>
+                      <DismissButton onClick={() => setSampleDataResult(null)}>&times;</DismissButton>
+                    </MessageAlert>
                   )}
 
-                  <p className="text-sm text-purple-800 mb-4">
+                  <Text $variant="bodySmall" style={{ color: '#2A1563', marginBottom: '1rem' }}>
                     Generate sample survey responses for testing metrics and dashboards.
-                  </p>
+                  </Text>
 
                   {surveysData && surveysData.surveys.length > 0 ? (
-                    <div className="space-y-4">
+                    <div>
                       {/* Survey Selection */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Survey</label>
-                        <select
+                      <div style={{ marginBottom: '1rem' }}>
+                        <Label>Select Survey</Label>
+                        <Select
                           value={selectedSurveyId}
                           onChange={(e) => setSelectedSurveyId(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
                           <option value="">Choose a survey...</option>
                           {surveysData.surveys.map((s: { id: string; name: string; team_name: string; status: string; question_count: number; response_count: number; can_generate?: boolean }) => (
@@ -595,40 +977,39 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                               {s.status !== 'active' ? `[${s.status.toUpperCase()}] ` : ''}{s.name} ({s.team_name}) - {s.question_count}q, {s.response_count} responses
                             </option>
                           ))}
-                        </select>
+                        </Select>
                         {selectedSurveyId && surveysData.surveys.find((s: { id: string; status: string }) => s.id === selectedSurveyId)?.status !== 'active' && (
-                          <p className="text-xs text-red-600 mt-1">This survey must be activated before generating sample data.</p>
+                          <Text $variant="helper" $color="error" style={{ marginTop: '0.25rem' }}>This survey must be activated before generating sample data.</Text>
                         )}
                       </div>
 
                       {/* Count and Mode */}
-                      <div className="grid grid-cols-2 gap-4">
+                      <Grid $columns={2} $gap="spacingLG">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Number of Responses</label>
-                          <input
+                          <Label>Number of Responses</Label>
+                          <NumberInput
                             type="number"
                             min={1}
                             max={50}
                             value={sampleCount}
-                            onChange={(e) => setSampleCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSampleCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                            $fullWidth
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Generation Mode</label>
-                          <select
+                          <Label>Generation Mode</Label>
+                          <Select
                             value={sampleMode}
                             onChange={(e) => setSampleMode(e.target.value as 'random' | 'persona')}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
                             <option value="random">Random (fast)</option>
                             <option value="persona">Persona-based (LLM, realistic)</option>
-                          </select>
+                          </Select>
                         </div>
-                      </div>
+                      </Grid>
 
                       {/* Mode Description */}
-                      <div className="text-xs text-gray-600 bg-white rounded p-2">
+                      <ModeDescription style={{ marginTop: '1rem' }}>
                         {sampleMode === 'random' ? (
                           <>
                             <strong>Random Mode:</strong> Generates statistically distributed random answers. Fast and good for stress testing.
@@ -639,121 +1020,118 @@ export function StatusModal({ isOpen, onClose }: StatusModalProps) {
                             (e.g., "Frustrated Veteran", "Enthusiastic New Hire", "Burned Out Manager").
                             Slower but produces more realistic data patterns.
                             {surveysData.personas_available && (
-                              <div className="mt-1">
+                              <div style={{ marginTop: '0.25rem' }}>
                                 Available personas: {surveysData.personas_available.slice(0, 4).join(', ')}
                                 {surveysData.personas_available.length > 4 && ` + ${surveysData.personas_available.length - 4} more`}
                               </div>
                             )}
                           </>
                         )}
-                      </div>
+                      </ModeDescription>
 
                       {/* Generate Button */}
-                      <button
+                      <Button
+                        $fullWidth
+                        style={{ marginTop: '1rem', backgroundColor: '#5B4599' }}
                         onClick={handleGenerateSampleData}
                         disabled={
                           generateSampleData.isPending ||
                           !selectedSurveyId ||
                           surveysData.surveys.find((s: { id: string; status: string }) => s.id === selectedSurveyId)?.status !== 'active'
                         }
-                        className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         {generateSampleData.isPending ? 'Generating...' : `Generate ${sampleCount} Sample Response${sampleCount > 1 ? 's' : ''}`}
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <div className="text-center py-4 text-gray-500">
-                      <p>No surveys with questions found.</p>
-                      <p className="text-xs mt-1">Create a survey and generate questions first, then activate it.</p>
-                    </div>
+                    <EmptyState>
+                      <Text>No surveys with questions found.</Text>
+                      <Text $variant="helper" style={{ marginTop: '0.25rem' }}>Create a survey and generate questions first, then activate it.</Text>
+                    </EmptyState>
                   )}
-                </div>
-              </section>
+                </PurpleSection>
+              </Section>
 
               {/* Synced Occupations */}
               {status.synced_occupations.length > 0 && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-3">
+                <Section>
+                  <SectionTitle>
                     Synced Occupations ({status.synced_occupations.length})
-                  </h3>
-                  <div className="bg-gray-50 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-100">
+                  </SectionTitle>
+                  <InfoBox style={{ padding: 0, overflow: 'hidden' }}>
+                    <Table>
+                      <TableHeader>
                         <tr>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Code</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
-                          <th className="px-4 py-2 text-center font-medium text-gray-600">Tasks</th>
-                          <th className="px-4 py-2 text-center font-medium text-gray-600">Teams</th>
-                          <th className="px-4 py-2 text-center font-medium text-gray-600">Surveys</th>
-                          <th className="px-4 py-2 text-center font-medium text-gray-600">Actions</th>
+                          <TableHeaderCell>Code</TableHeaderCell>
+                          <TableHeaderCell>Name</TableHeaderCell>
+                          <TableHeaderCell style={{ textAlign: 'center' }}>Tasks</TableHeaderCell>
+                          <TableHeaderCell style={{ textAlign: 'center' }}>Teams</TableHeaderCell>
+                          <TableHeaderCell style={{ textAlign: 'center' }}>Surveys</TableHeaderCell>
+                          <TableHeaderCell style={{ textAlign: 'center' }}>Actions</TableHeaderCell>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      </TableHeader>
+                      <tbody>
                         {status.synced_occupations.map((occ) => (
-                          <tr key={occ.id} className="hover:bg-gray-100">
-                            <td className="px-4 py-2 font-mono text-blue-600">
-                              {occ.faethm_code || '-'}
-                            </td>
-                            <td className="px-4 py-2">{occ.name}</td>
-                            <td className="px-4 py-2 text-center">{occ.task_count}</td>
-                            <td className="px-4 py-2 text-center">{occ.team_count}</td>
-                            <td className="px-4 py-2 text-center">{occ.survey_count}</td>
-                            <td className="px-4 py-2 text-center">
-                              <div className="flex justify-center gap-1">
-                                <button
+                          <TableRow key={occ.id}>
+                            <TableCell>
+                              <MonoText style={{ color: '#0080A7' }}>{occ.faethm_code || '-'}</MonoText>
+                            </TableCell>
+                            <TableCell>{occ.name}</TableCell>
+                            <TableCellCenter>{occ.task_count}</TableCellCenter>
+                            <TableCellCenter>{occ.team_count}</TableCellCenter>
+                            <TableCellCenter>{occ.survey_count}</TableCellCenter>
+                            <TableCellCenter>
+                              <Flex $justify="center" $gap="spacingXS">
+                                <ActionButtonSmall
+                                  $variant="warning"
                                   onClick={() => handleResetOccupation(occ.id, occ.name)}
                                   disabled={resetOccupation.isPending}
-                                  className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50"
                                   title="Reset task assignments"
                                 >
                                   Reset
-                                </button>
-                                <button
+                                </ActionButtonSmall>
+                                <ActionButtonSmall
+                                  $variant="danger"
                                   onClick={() => handleDeleteOccupation(occ.id, occ.name)}
                                   disabled={deleteOccupation.isPending}
-                                  className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                                   title="Delete occupation"
                                 >
                                   Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                                </ActionButtonSmall>
+                              </Flex>
+                            </TableCellCenter>
+                          </TableRow>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
-                </section>
+                    </Table>
+                  </InfoBox>
+                </Section>
               )}
-            </div>
+            </>
           ) : null}
-        </div>
+        </ScrollableBody>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-          <button
-            onClick={() => refetch()}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Refresh Status
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+        <ModalFooter>
+          <FooterContent>
+            <RefreshButton onClick={() => refetch()}>
+              Refresh Status
+            </RefreshButton>
+            <Button $variant="secondary" $size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </FooterContent>
+        </ModalFooter>
+      </ModalContent>
+    </ModalOverlay>
   )
 }
 
 function StatCard({ label, value, icon: _icon }: { label: string; value: number; icon: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
-      <p className="text-xs text-gray-500">{label}</p>
-    </div>
+    <StatCardContainer>
+      <StatValue>{value.toLocaleString()}</StatValue>
+      <StatLabel>{label}</StatLabel>
+    </StatCardContainer>
   )
 }

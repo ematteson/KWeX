@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import styled, { css } from 'styled-components'
 import {
   useTeamPsychSafetySurveys,
   useCreatePsychSafetySurvey,
@@ -25,22 +26,529 @@ const PSYCH_SAFETY_ITEM_LABELS: Record<number, string> = {
   7: 'Skills are valued',
 }
 
+// Styled Components
+const Card = styled.section`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const CardHeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const HeaderContent = styled.div``
+
+const CardTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const CardSubtitle = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+`
+
+interface ButtonProps {
+  $variant?: 'primary' | 'secondary' | 'warning' | 'warningOutline'
+  $size?: 'sm' | 'md'
+}
+
+const Button = styled.button<ButtonProps>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border: none;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  ${({ $size = 'md', theme }) => {
+    if ($size === 'sm') {
+      return css`
+        padding: ${theme.v1.spacing.spacingXXS} ${theme.v1.spacing.spacingMD};
+        font-size: ${theme.v1.typography.sizes.helper};
+      `
+    }
+    return css`
+      padding: ${theme.v1.spacing.spacingXS} ${theme.v1.spacing.spacingMD};
+      font-size: ${theme.v1.typography.sizes.bodyS};
+    `
+  }}
+
+  ${({ $variant = 'primary', theme }) => {
+    switch ($variant) {
+      case 'secondary':
+        return css`
+          background-color: transparent;
+          color: ${theme.v1.semanticColors.text.action.default};
+          border: 1px solid ${theme.v1.semanticColors.border.brand.default};
+          &:hover:not(:disabled) {
+            background-color: ${theme.v1.semanticColors.fill.highlight.brand.default};
+          }
+        `
+      case 'warning':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.warning.bold};
+          color: ${theme.v1.semanticColors.text.inverse};
+          &:hover:not(:disabled) {
+            opacity: 0.9;
+          }
+        `
+      case 'warningOutline':
+        return css`
+          background-color: ${theme.v1.semanticColors.canvas.default};
+          color: ${theme.v1.semanticColors.text.feedback.warning.default};
+          border: 1px solid ${theme.v1.semanticColors.border.feedback.warning};
+          &:hover:not(:disabled) {
+            background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+          }
+        `
+      default:
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.action.brand.default};
+          color: ${theme.v1.semanticColors.text.inverse};
+          &:hover:not(:disabled) {
+            background-color: ${theme.v1.semanticColors.fill.action.brand.hover};
+          }
+        `
+    }
+  }}
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const ErrorAlert = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.error.subtle};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.error};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.default};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.vibrant};
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.default};
+  }
+`
+
+const IconButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  }
+`
+
+const SkeletonBlock = styled.div<{ $height?: string; $width?: string }>`
+  height: ${({ $height = '16px' }) => $height};
+  width: ${({ $width = '100%' }) => $width};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`
+
+const LoadingWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const ContentStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+// Active Survey Card Styles
+const ActiveSurveyWrapper = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.colors.primary[400]}30;
+  background-color: ${({ theme }) => theme.v1.colors.primary[400]}08;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const SurveyHeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const SurveyTitle = styled.h4`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const ActiveBadge = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+  color: ${({ theme }) => theme.v1.semanticColors.text.inverse};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+`
+
+const ClosedBadge = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+`
+
+const ResponseCount = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const WarningText = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+  margin-left: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const LinkButton = styled.button`
+  background: none;
+  border: none;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const LinkInputRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const LinkInput = styled.input`
+  flex: 1;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+`
+
+interface CopyButtonProps {
+  $copied?: boolean
+}
+
+const CopyButton = styled.button<CopyButtonProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingMD};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  ${({ $copied, theme }) => $copied
+    ? css`
+        background-color: ${theme.v1.semanticColors.fill.feedback.success.bold};
+        color: ${theme.v1.semanticColors.text.inverse};
+      `
+    : css`
+        background-color: ${theme.v1.semanticColors.fill.action.brand.default};
+        color: ${theme.v1.semanticColors.text.inverse};
+        &:hover {
+          background-color: ${theme.v1.semanticColors.fill.action.brand.hover};
+        }
+      `
+  }
+`
+
+const CloseConfirmBox = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.subtle};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.warning};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+`
+
+const ConfirmText = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const ConfirmActions = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+// Closed Survey Card Styles
+const ClosedSurveyWrapper = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+// Draft Survey Card Styles
+const DraftSurveyWrapper = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.warning};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.warning.subtle};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const DraftRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
+
+const DraftLabel = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+`
+
+// Results Styles
+const ResultsWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ResultsHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
+
+const ScoreWrapper = styled.div``
+
+const OverallScore = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+`
+
+const ScoreMax = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.regular};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ResponseCountText = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const InterpretationWrapper = styled.div`
+  text-align: right;
+`
+
+interface InterpretationBadgeProps {
+  $interpretation?: string
+}
+
+const InterpretationBadge = styled.span<InterpretationBadgeProps>`
+  display: inline-block;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingMD};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+
+  ${({ $interpretation, theme }) => {
+    switch ($interpretation) {
+      case 'Low':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.error.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.error.default};
+        `
+      case 'Moderate':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.warning.default};
+        `
+      case 'High':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.success.default};
+        `
+      default:
+        return ''
+    }
+  }}
+`
+
+const PercentileText = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const ItemScoresWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const GaugeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const GaugeLabel = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  width: 128px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const GaugeBar = styled.div`
+  flex: 1;
+  height: 8px;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  overflow: hidden;
+`
+
+interface GaugeFillProps {
+  $percentage: number
+  $score: number
+}
+
+const GaugeFill = styled.div<GaugeFillProps>`
+  height: 100%;
+  width: ${({ $percentage }) => $percentage}%;
+  transition: width 0.5s ease;
+  background-color: ${({ $score, theme }) => {
+    if ($score >= 5.5) return theme.v1.semanticColors.fill.feedback.success.bold
+    if ($score >= 4.0) return theme.v1.semanticColors.fill.feedback.warning.bold
+    return theme.v1.semanticColors.fill.feedback.error.bold
+  }};
+`
+
+const GaugeValue = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  width: 40px;
+  text-align: right;
+`
+
+const PrivacyMessage = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const PrivacyText = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0;
+`
+
+const PrivacySubtext = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing2XL} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const EmptyStateText = styled.p`
+  margin: 0;
+`
+
+const EmptyStateSubtext = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+`
+
+const HistoryDetails = styled.details`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const HistorySummary = styled.summary`
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+
+  &:hover {
+    text-decoration: underline;
+  }
+`
+
+const HistoryList = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+// Sub-components
 function ScoreGauge({ score, label }: { score: number; label: string }) {
   // Score is on 1-7 scale
   const percentage = ((score - 1) / 6) * 100
-  const color = score >= 5.5 ? 'bg-emerald-500' : score >= 4.0 ? 'bg-amber-500' : 'bg-red-500'
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-pearson-gray-600 w-32 truncate" title={label}>{label}</span>
-      <div className="flex-1 h-2 bg-pearson-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} transition-all duration-500`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      <span className="text-sm font-medium text-pearson-gray-700 w-10 text-right">{score.toFixed(1)}</span>
-    </div>
+    <GaugeRow>
+      <GaugeLabel title={label}>{label}</GaugeLabel>
+      <GaugeBar>
+        <GaugeFill $percentage={percentage} $score={score} />
+      </GaugeBar>
+      <GaugeValue>{score.toFixed(1)}</GaugeValue>
+    </GaugeRow>
   )
 }
 
@@ -50,60 +558,54 @@ function PsychSafetyResults({ survey }: { survey: Survey }) {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-3">
-        <div className="h-16 bg-pearson-gray-200 rounded"></div>
-        <div className="h-4 bg-pearson-gray-200 rounded w-3/4"></div>
-      </div>
+      <LoadingWrapper>
+        <SkeletonBlock $height="64px" />
+        <SkeletonBlock $height="16px" $width="75%" />
+      </LoadingWrapper>
     )
   }
 
   if (!results?.meets_privacy_threshold) {
     return (
-      <div className="text-center py-4">
-        <p className="text-pearson-gray-600">Privacy threshold not met</p>
-        <p className="text-sm text-pearson-gray-500 mt-1">
+      <PrivacyMessage>
+        <PrivacyText>Privacy threshold not met</PrivacyText>
+        <PrivacySubtext>
           {stats?.complete_responses || 0} of 7 minimum responses received
-        </p>
-      </div>
+        </PrivacySubtext>
+      </PrivacyMessage>
     )
   }
 
-  const interpretationColors: Record<string, string> = {
-    Low: 'text-red-600 bg-red-50',
-    Moderate: 'text-amber-600 bg-amber-50',
-    High: 'text-emerald-600 bg-emerald-50',
-  }
-
   return (
-    <div className="space-y-4">
+    <ResultsWrapper>
       {/* Overall Score */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-3xl font-bold text-pearson-gray-900">
+      <ResultsHeader>
+        <ScoreWrapper>
+          <OverallScore>
             {results.overall_score?.toFixed(1)}
-            <span className="text-lg font-normal text-pearson-gray-500">/7</span>
-          </div>
-          <div className="text-sm text-pearson-gray-500">
+            <ScoreMax>/7</ScoreMax>
+          </OverallScore>
+          <ResponseCountText>
             Based on {results.respondent_count} responses
-          </div>
-        </div>
-        <div className="text-right">
+          </ResponseCountText>
+        </ScoreWrapper>
+        <InterpretationWrapper>
           {results.interpretation && (
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${interpretationColors[results.interpretation] || ''}`}>
+            <InterpretationBadge $interpretation={results.interpretation}>
               {results.interpretation}
-            </span>
+            </InterpretationBadge>
           )}
           {results.benchmark_percentile && (
-            <div className="text-xs text-pearson-gray-500 mt-1">
+            <PercentileText>
               {results.benchmark_percentile}th percentile
-            </div>
+            </PercentileText>
           )}
-        </div>
-      </div>
+        </InterpretationWrapper>
+      </ResultsHeader>
 
       {/* Item Scores */}
       {results.item_scores && results.item_scores.length > 0 && (
-        <div className="space-y-2 pt-2 border-t border-pearson-gray-100">
+        <ItemScoresWrapper>
           {results.item_scores.map((item) => (
             <ScoreGauge
               key={item.item_number}
@@ -111,9 +613,9 @@ function PsychSafetyResults({ survey }: { survey: Survey }) {
               label={PSYCH_SAFETY_ITEM_LABELS[item.item_number] || `Item ${item.item_number}`}
             />
           ))}
-        </div>
+        </ItemScoresWrapper>
       )}
-    </div>
+    </ResultsWrapper>
   )
 }
 
@@ -140,101 +642,91 @@ function ActiveSurveyCard({ survey, onClose }: { survey: Survey; onClose: (id: s
   }
 
   return (
-    <div className="border border-pearson-blue/30 bg-pearson-blue/5 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-medium text-pearson-gray-800">{survey.name}</h4>
-        <div className="flex items-center gap-2">
-          <span className="text-xs px-2 py-1 bg-pearson-blue text-white rounded-full">Active</span>
-          <button
+    <ActiveSurveyWrapper>
+      <SurveyHeaderRow>
+        <SurveyTitle>{survey.name}</SurveyTitle>
+        <HeaderActions>
+          <ActiveBadge>Active</ActiveBadge>
+          <IconButton
             onClick={() => setShowCloseConfirm(true)}
-            className="text-xs text-pearson-gray-500 hover:text-pearson-gray-700"
             title="Close survey"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
-        </div>
-      </div>
+          </IconButton>
+        </HeaderActions>
+      </SurveyHeaderRow>
 
-      <div className="text-sm text-pearson-gray-600 mb-3">
+      <ResponseCount>
         {stats?.complete_responses || 0} responses collected
         {stats && !stats.meets_privacy_threshold && (
-          <span className="text-amber-600 ml-2">
+          <WarningText>
             (need {7 - (stats.complete_responses || 0)} more)
-          </span>
+          </WarningText>
         )}
-      </div>
+      </ResponseCount>
 
       {!surveyUrl ? (
-        <button
+        <LinkButton
           onClick={handleGetLink}
           disabled={generateLink.isPending}
-          className="text-sm text-pearson-blue hover:underline"
         >
           {generateLink.isPending ? 'Generating...' : 'Get Survey Link'}
-        </button>
+        </LinkButton>
       ) : (
-        <div className="flex items-center gap-2">
-          <input
+        <LinkInputRow>
+          <LinkInput
             type="text"
             value={surveyUrl}
             readOnly
-            className="flex-1 text-xs p-2 bg-white border border-pearson-gray-200 rounded"
           />
-          <button
-            onClick={handleCopyLink}
-            className={`text-xs px-3 py-2 rounded transition-colors ${
-              copied
-                ? 'bg-green-600 text-white'
-                : 'bg-pearson-blue text-white hover:bg-pearson-blue/90'
-            }`}
-          >
+          <CopyButton onClick={handleCopyLink} $copied={copied}>
             {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
+          </CopyButton>
+        </LinkInputRow>
       )}
 
       {/* Close confirmation dialog */}
       {showCloseConfirm && (
-        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800 mb-2">
+        <CloseConfirmBox>
+          <ConfirmText>
             Close this assessment? Results will be calculated with current responses.
-          </p>
-          <div className="flex gap-2">
-            <button
+          </ConfirmText>
+          <ConfirmActions>
+            <Button
+              $variant="warning"
+              $size="sm"
               onClick={() => {
                 onClose(survey.id)
                 setShowCloseConfirm(false)
               }}
-              className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700"
             >
               Close Assessment
-            </button>
-            <button
+            </Button>
+            <Button
+              $variant="warningOutline"
+              $size="sm"
               onClick={() => setShowCloseConfirm(false)}
-              className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-50"
             >
               Cancel
-            </button>
-          </div>
-        </div>
+            </Button>
+          </ConfirmActions>
+        </CloseConfirmBox>
       )}
-    </div>
+    </ActiveSurveyWrapper>
   )
 }
 
 function ClosedSurveyCard({ survey }: { survey: Survey }) {
   return (
-    <div className="border border-pearson-gray-200 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-medium text-pearson-gray-800">{survey.name}</h4>
-        <span className="text-xs px-2 py-1 bg-pearson-gray-200 text-pearson-gray-600 rounded-full">
-          Closed
-        </span>
-      </div>
+    <ClosedSurveyWrapper>
+      <SurveyHeaderRow>
+        <SurveyTitle>{survey.name}</SurveyTitle>
+        <ClosedBadge>Closed</ClosedBadge>
+      </SurveyHeaderRow>
       <PsychSafetyResults survey={survey} />
-    </div>
+    </ClosedSurveyWrapper>
   )
 }
 
@@ -277,43 +769,43 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
   }
 
   return (
-    <section className="card">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="card-header mb-0">Psychological Safety</h2>
-          <p className="text-xs text-pearson-gray-500 mt-1">
+    <Card>
+      <CardHeaderRow>
+        <HeaderContent>
+          <CardTitle>Psychological Safety</CardTitle>
+          <CardSubtitle>
             Edmondson's 7-item validated scale
-          </p>
-        </div>
+          </CardSubtitle>
+        </HeaderContent>
         {activeSurveys.length === 0 && (
-          <button
+          <Button
             onClick={handleCreateAndActivate}
             disabled={isCreating}
-            className="btn-primary text-sm"
+            $size="sm"
           >
             {isCreating ? 'Creating...' : 'Start Assessment'}
-          </button>
+          </Button>
         )}
-      </div>
+      </CardHeaderRow>
 
       {/* Error message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+        <ErrorAlert>
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <CloseButton onClick={() => setError(null)}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
-        </div>
+          </CloseButton>
+        </ErrorAlert>
       )}
 
       {isLoading ? (
-        <div className="animate-pulse space-y-3">
-          <div className="h-20 bg-pearson-gray-200 rounded"></div>
-        </div>
+        <LoadingWrapper>
+          <SkeletonBlock $height="80px" />
+        </LoadingWrapper>
       ) : (
-        <div className="space-y-4">
+        <ContentStack>
           {/* Active Surveys */}
           {activeSurveys.map(survey => (
             <ActiveSurveyCard key={survey.id} survey={survey} onClose={handleCloseSurvey} />
@@ -321,17 +813,14 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
 
           {/* Draft Surveys (shouldn't normally exist, but handle) */}
           {draftSurveys.map(survey => (
-            <div key={survey.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-amber-800">{survey.name} (Draft)</span>
-                <button
-                  onClick={() => activateSurvey.mutate(survey.id)}
-                  className="text-sm text-pearson-blue hover:underline"
-                >
+            <DraftSurveyWrapper key={survey.id}>
+              <DraftRow>
+                <DraftLabel>{survey.name} (Draft)</DraftLabel>
+                <LinkButton onClick={() => activateSurvey.mutate(survey.id)}>
                   Activate
-                </button>
-              </div>
-            </div>
+                </LinkButton>
+              </DraftRow>
+            </DraftSurveyWrapper>
           ))}
 
           {/* Latest Results */}
@@ -341,29 +830,29 @@ export function PsychSafetyCard({ teamId }: PsychSafetyCardProps) {
 
           {/* No surveys yet */}
           {surveys?.length === 0 && (
-            <div className="text-center py-6 text-pearson-gray-500">
-              <p>No psychological safety assessments yet</p>
-              <p className="text-sm mt-1">
+            <EmptyState>
+              <EmptyStateText>No psychological safety assessments yet</EmptyStateText>
+              <EmptyStateSubtext>
                 Run an assessment to measure team psychological safety using Edmondson's validated scale
-              </p>
-            </div>
+              </EmptyStateSubtext>
+            </EmptyState>
           )}
 
           {/* Historical surveys link */}
           {closedSurveys.length > 1 && (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-pearson-blue hover:underline">
+            <HistoryDetails>
+              <HistorySummary>
                 View {closedSurveys.length - 1} previous assessment{closedSurveys.length > 2 ? 's' : ''}
-              </summary>
-              <div className="mt-3 space-y-3">
+              </HistorySummary>
+              <HistoryList>
                 {closedSurveys.slice(1).map(survey => (
                   <ClosedSurveyCard key={survey.id} survey={survey} />
                 ))}
-              </div>
-            </details>
+              </HistoryList>
+            </HistoryDetails>
           )}
-        </div>
+        </ContentStack>
       )}
-    </section>
+    </Card>
   )
 }

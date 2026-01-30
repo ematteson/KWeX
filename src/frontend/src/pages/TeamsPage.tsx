@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import styled, { css, keyframes } from 'styled-components'
 import {
   useTeams,
   useOccupations,
@@ -9,6 +10,644 @@ import {
   useSyncSingleOccupation,
 } from '../api/hooks'
 import type { CSVUploadResult, AvailableOccupation, Occupation } from '../api/types'
+import {
+  Button,
+  Card,
+  Input,
+  Heading,
+  Text,
+  Flex,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Spinner,
+  Badge,
+} from '../design-system/components'
+
+// =============================================================================
+// STYLED COMPONENTS
+// =============================================================================
+
+const PageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const HeaderSection = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const TeamsGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`
+
+const SkeletonCard = styled(Card)`
+  animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+`
+
+const SkeletonBox = styled.div<{ $width?: string; $height?: string; $marginBottom?: string }>`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  width: ${({ $width }) => $width || '100%'};
+  height: ${({ $height }) => $height || '1rem'};
+  margin-bottom: ${({ $marginBottom }) => $marginBottom || '0'};
+`
+
+const TeamCard = styled(Link)`
+  display: block;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: ${({ theme }) => theme.v1.shadows.md};
+  }
+`
+
+const TeamCardContent = styled(Card)`
+  height: 100%;
+`
+
+const TeamTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+  transition: color 0.2s ease;
+
+  ${TeamCard}:hover & {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  }
+`
+
+const TeamFunction = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const TeamMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const AlertBox = styled.div<{ $variant: 'success' | 'warning' }>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+    border: 1px solid ${theme.v1.semanticColors.border.feedback.success};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'warning' && css`
+    background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+    border: 1px solid ${theme.v1.semanticColors.border.feedback.warning};
+  `}
+`
+
+const AlertText = styled.p<{ $variant: 'success' | 'warning' }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  margin: 0;
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    color: ${theme.v1.semanticColors.text.feedback.success.default};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'warning' && css`
+    color: ${theme.v1.semanticColors.text.feedback.warning.default};
+  `}
+`
+
+const AlertLink = styled.button<{ $variant: 'success' | 'warning' }>`
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    color: ${theme.v1.semanticColors.text.feedback.success.default};
+    &:hover {
+      color: ${theme.v1.semanticColors.text.feedback.success.vibrant};
+    }
+  `}
+
+  ${({ $variant, theme }) => $variant === 'warning' && css`
+    color: ${theme.v1.semanticColors.text.feedback.warning.default};
+    font-weight: ${theme.v1.typography.weights.semibold};
+    &:hover {
+      color: ${theme.v1.semanticColors.text.feedback.warning.vibrant};
+    }
+  `}
+`
+
+const OccupationChipList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const OccupationChip = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingXS};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.success};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.success.subtle};
+  }
+`
+
+const OccupationCode = styled.span`
+  font-family: monospace;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.success.vibrant};
+`
+
+const OccupationName = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const MoreButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.feedback.success};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.success.vibrant};
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.success.subtle};
+  }
+`
+
+const EmptyState = styled(Card)`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing5XL};
+`
+
+const ErrorState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing5XL};
+`
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS};
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.neutral.default};
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.icon.neutral.dark};
+  }
+`
+
+const ModalTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const ModalDescription = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const SearchInput = styled(Input)`
+  width: 100%;
+`
+
+const OccupationModalBody = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const OccupationModalContainer = styled(ModalContent)`
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`
+
+const SearchHint = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const SyncLink = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+`
+
+const LoadingContainer = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL};
+`
+
+const ResultCount = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const OccupationList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const OccupationItem = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  transition: border-color 0.2s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.v1.semanticColors.border.neutral.dark};
+  }
+`
+
+const OccupationItemHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+`
+
+const OccupationItemContent = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding-right: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const OccupationItemActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const OccupationItemCode = styled.span`
+  font-family: monospace;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+`
+
+const OccupationItemName = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0;
+`
+
+const OccupationItemDescription = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`
+
+const NoResults = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ModalFooterInfo = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const ModalFooterWithInfo = styled(ModalFooter)`
+  justify-content: space-between;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+`
+
+// Upload Modal Styles
+const SectionTitle = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const CodeBlock = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  font-family: monospace;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  overflow-x: auto;
+`
+
+const CodeLine = styled.p<{ $subtle?: boolean }>`
+  margin: 0;
+  color: ${({ theme, $subtle }) =>
+    $subtle ? theme.v1.semanticColors.text.body.subtle : theme.v1.semanticColors.text.body.default};
+`
+
+const OccupationCodesList = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  max-height: 10rem;
+  overflow-y: auto;
+`
+
+const OccupationCodeItem = styled.li`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const OccupationCodeLabel = styled.span`
+  font-family: monospace;
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+`
+
+const MoreText = styled.li`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const TemplateLink = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+`
+
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  cursor: pointer;
+`
+
+const Checkbox = styled.input`
+  width: 1rem;
+  height: 1rem;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusXS};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.inputs.default};
+  cursor: pointer;
+
+  &:checked {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+    border-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+  }
+`
+
+const CheckboxText = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const DropZone = styled.div`
+  border: 2px dashed ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.v1.semanticColors.border.brand.default};
+  }
+`
+
+const DropZoneIcon = styled.svg`
+  margin: 0 auto;
+  height: 3rem;
+  width: 3rem;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.neutral.light};
+`
+
+const DropZoneText = styled.p`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const DropZoneLink = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+`
+
+const DropZoneHint = styled.p`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const HiddenInput = styled.input`
+  display: none;
+`
+
+const UploadingContainer = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  text-align: center;
+`
+
+const UploadingText = styled.p`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+// Result styles
+const ResultGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  text-align: center;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ResultCard = styled.div<{ $variant: 'success' | 'info' | 'error' }>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'info' && css`
+    background-color: ${theme.v1.semanticColors.fill.feedback.info.subtle};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'error' && css`
+    background-color: ${theme.v1.semanticColors.fill.feedback.error.subtle};
+  `}
+`
+
+const ResultNumber = styled.p<{ $variant: 'success' | 'info' | 'error' }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  margin: 0;
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    color: ${theme.v1.semanticColors.text.feedback.success.vibrant};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'info' && css`
+    color: ${theme.v1.semanticColors.text.feedback.info.vibrant};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'error' && css`
+    color: ${theme.v1.semanticColors.text.feedback.error.vibrant};
+  `}
+`
+
+const ResultLabel = styled.p<{ $variant: 'success' | 'info' | 'error' }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  margin: 0;
+
+  ${({ $variant, theme }) => $variant === 'success' && css`
+    color: ${theme.v1.semanticColors.text.feedback.success.default};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'info' && css`
+    color: ${theme.v1.semanticColors.text.feedback.info.default};
+  `}
+
+  ${({ $variant, theme }) => $variant === 'error' && css`
+    color: ${theme.v1.semanticColors.text.feedback.error.default};
+  `}
+`
+
+const ErrorsSection = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ErrorsTitle = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const ErrorsList = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.error.subtle};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  max-height: 10rem;
+  overflow-y: auto;
+`
+
+const ErrorItem = styled.li`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.error.default};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const TeamsSection = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const TeamsTitle = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const TeamsList = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  max-height: 10rem;
+  overflow-y: auto;
+`
+
+const TeamItem = styled.li`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const FormSection = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const WarningText = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.warning.default};
+  margin: 0;
+`
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
 
 export function TeamsPage() {
   const navigate = useNavigate()
@@ -74,462 +713,411 @@ export function TeamsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-pearson-gray-900">Teams</h1>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <PageContainer>
+        <Heading $level={1}>Teams</Heading>
+        <TeamsGrid>
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="h-5 bg-pearson-gray-200 rounded w-32 mb-2"></div>
-              <div className="h-4 bg-pearson-gray-200 rounded w-24 mb-3"></div>
-              <div className="h-3 bg-pearson-gray-200 rounded w-20"></div>
-            </div>
+            <SkeletonCard key={i}>
+              <SkeletonBox $width="8rem" $height="1.25rem" $marginBottom="0.5rem" />
+              <SkeletonBox $width="6rem" $height="1rem" $marginBottom="0.75rem" />
+              <SkeletonBox $width="5rem" $height="0.75rem" />
+            </SkeletonCard>
           ))}
-        </div>
-      </div>
+        </TeamsGrid>
+      </PageContainer>
     )
   }
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-lg font-medium text-pearson-gray-900 mb-2">Unable to load teams</h2>
-        <p className="text-pearson-gray-600">Please check your connection and try again.</p>
-      </div>
+      <ErrorState>
+        <Heading $level={3}>Unable to load teams</Heading>
+        <Text $color="subtle">Please check your connection and try again.</Text>
+      </ErrorState>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-pearson-gray-900">Teams</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowOccupationModal(true)}
-            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-          >
+    <PageContainer>
+      <HeaderSection>
+        <Heading $level={1}>Teams</Heading>
+        <ButtonGroup>
+          <Button $variant="secondary" onClick={() => setShowOccupationModal(true)}>
             Browse Occupations
-          </button>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
+          </Button>
+          <Button onClick={() => setShowUploadModal(true)}>
             Upload CSV
-          </button>
-        </div>
-      </div>
+          </Button>
+        </ButtonGroup>
+      </HeaderSection>
 
       {/* Occupations Status */}
       {occupations && occupations.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-green-800">
-              <span className="font-medium">{occupations.length} occupations</span> synced.{' '}
-              <button
-                onClick={() => setShowOccupationModal(true)}
-                className="underline hover:text-green-900"
-              >
+        <AlertBox $variant="success">
+          <Flex $justify="between" $align="center">
+            <AlertText $variant="success">
+              <strong>{occupations.length} occupations</strong> synced.{' '}
+              <AlertLink $variant="success" onClick={() => setShowOccupationModal(true)}>
                 Browse all available occupations
-              </button>
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+              </AlertLink>
+            </AlertText>
+          </Flex>
+          <OccupationChipList>
             {occupations.slice(0, 10).map((occ: Occupation) => (
-              <Link
-                key={occ.id}
-                to={`/occupations/${occ.id}`}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-green-200 rounded-full text-sm hover:bg-green-100 transition-colors"
-              >
-                <span className="font-mono text-xs text-green-700">{occ.faethm_code}</span>
-                <span className="text-gray-700">{occ.name}</span>
-              </Link>
+              <OccupationChip key={occ.id} to={`/occupations/${occ.id}`}>
+                <OccupationCode>{occ.faethm_code}</OccupationCode>
+                <OccupationName>{occ.name}</OccupationName>
+              </OccupationChip>
             ))}
             {occupations.length > 10 && (
-              <button
-                onClick={() => setShowOccupationModal(true)}
-                className="inline-flex items-center px-3 py-1 bg-white border border-green-200 rounded-full text-sm text-green-600 hover:bg-green-100"
-              >
+              <MoreButton onClick={() => setShowOccupationModal(true)}>
                 +{occupations.length - 10} more
-              </button>
+              </MoreButton>
             )}
-          </div>
-        </div>
+          </OccupationChipList>
+        </AlertBox>
       )}
 
       {(!occupations || occupations.length === 0) && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-800">
+        <AlertBox $variant="warning">
+          <AlertText $variant="warning">
             No occupations synced yet.{' '}
-            <button
-              onClick={() => setShowOccupationModal(true)}
-              className="underline hover:text-yellow-900 font-medium"
-            >
+            <AlertLink $variant="warning" onClick={() => setShowOccupationModal(true)}>
               Browse and sync occupations
-            </button>{' '}
+            </AlertLink>{' '}
             to get started.
-          </p>
-        </div>
+          </AlertText>
+        </AlertBox>
       )}
 
       {teams && teams.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <TeamsGrid>
           {teams.map((team) => (
-            <Link
-              key={team.id}
-              to={`/teams/${team.id}`}
-              className="card hover:shadow-md transition-shadow group"
-            >
-              <h2 className="text-lg font-semibold text-pearson-gray-800 group-hover:text-pearson-blue transition-colors">
-                {team.name}
-              </h2>
-              <p className="text-sm text-pearson-gray-600 mb-3">{team.function}</p>
-              <div className="flex items-center gap-4 text-xs text-pearson-gray-500">
-                <span>{team.member_count} members</span>
-              </div>
-            </Link>
+            <TeamCard key={team.id} to={`/teams/${team.id}`}>
+              <TeamCardContent>
+                <TeamTitle>{team.name}</TeamTitle>
+                <TeamFunction>{team.function}</TeamFunction>
+                <TeamMeta>
+                  <span>{team.member_count} members</span>
+                </TeamMeta>
+              </TeamCardContent>
+            </TeamCard>
           ))}
-        </div>
+        </TeamsGrid>
       ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-pearson-gray-200">
-          <h2 className="text-lg font-medium text-pearson-gray-900 mb-2">No teams found</h2>
-          <p className="text-pearson-gray-600 mb-4">Upload a CSV file to create teams.</p>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
+        <EmptyState $variant="outlined">
+          <Heading $level={3}>No teams found</Heading>
+          <Text $color="subtle" style={{ marginBottom: '1rem' }}>
+            Upload a CSV file to create teams.
+          </Text>
+          <Button onClick={() => setShowUploadModal(true)}>
             Upload CSV
-          </button>
-        </div>
+          </Button>
+        </EmptyState>
       )}
 
       {/* Occupation Browser Modal */}
       {showOccupationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Browse Occupations</h2>
-                <button
-                  onClick={() => {
-                    setShowOccupationModal(false)
-                    setOccupationSearch('')
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <ModalOverlay>
+          <OccupationModalContainer $size="lg">
+            <ModalHeader>
+              <ModalTitle>Browse Occupations</ModalTitle>
+              <CloseButton
+                onClick={() => {
+                  setShowOccupationModal(false)
+                  setOccupationSearch('')
+                }}
+              >
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </CloseButton>
+            </ModalHeader>
 
-              <p className="text-sm text-gray-600 mb-4">
+            <ModalBody>
+              <ModalDescription>
                 Search from 1,400+ Faethm job codes. Sync the ones you need for your teams.
-              </p>
-
-              <input
+              </ModalDescription>
+              <SearchInput
                 type="text"
                 value={occupationSearch}
                 onChange={(e) => setOccupationSearch(e.target.value)}
                 placeholder="Search by job name or code (e.g., 'manager', 'ADM')..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                $fullWidth
               />
-            </div>
+            </ModalBody>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <OccupationModalBody>
               {occupationSearch.length < 2 ? (
-                <div className="text-center py-8 text-gray-500">
+                <SearchHint>
                   <p>Type at least 2 characters to search occupations</p>
-                  <p className="text-sm mt-2">
+                  <p style={{ marginTop: '0.5rem' }}>
                     Or{' '}
-                    <button
+                    <SyncLink
                       onClick={handleSyncOccupations}
                       disabled={syncOccupations.isPending}
-                      className="text-blue-600 hover:text-blue-800 underline"
                     >
                       {syncOccupations.isPending ? 'syncing...' : 'sync first 50 occupations'}
-                    </button>
+                    </SyncLink>
                   </p>
-                </div>
+                </SearchHint>
               ) : searchingOccupations ? (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <p className="mt-2 text-gray-600">Searching...</p>
-                </div>
+                <LoadingContainer>
+                  <Spinner />
+                  <Text $color="subtle" style={{ marginTop: '0.5rem' }}>Searching...</Text>
+                </LoadingContainer>
               ) : availableOccupations && availableOccupations.occupations.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500 mb-4">
+                <OccupationList>
+                  <ResultCount>
                     Showing {availableOccupations.returned} of {availableOccupations.total_available} total occupations
-                  </p>
+                  </ResultCount>
                   {availableOccupations.occupations.map((occ: AvailableOccupation) => {
                     const syncedOccupation = occupations?.find((o: Occupation) => o.faethm_code === occ.faethm_code)
                     const isSynced = !!syncedOccupation
                     const isSyncing = syncingCode === occ.faethm_code
 
                     return (
-                      <div
-                        key={occ.faethm_code}
-                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0 pr-4">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm text-blue-600 font-medium">
-                                {occ.faethm_code}
-                              </span>
+                      <OccupationItem key={occ.faethm_code}>
+                        <OccupationItemHeader>
+                          <OccupationItemContent>
+                            <Flex $align="center" $gap="spacingSM">
+                              <OccupationItemCode>{occ.faethm_code}</OccupationItemCode>
                               {isSynced && (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                  Synced
-                                </span>
+                                <Badge $variant="success" $size="sm">Synced</Badge>
                               )}
-                            </div>
-                            <h3 className="font-medium text-gray-900 mt-1">{occ.name}</h3>
-                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                              {occ.description}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-2">
+                            </Flex>
+                            <OccupationItemName>{occ.name}</OccupationItemName>
+                            <OccupationItemDescription>{occ.description}</OccupationItemDescription>
+                          </OccupationItemContent>
+                          <OccupationItemActions>
                             {isSynced ? (
-                              <button
+                              <Button
+                                $size="sm"
                                 onClick={() => {
                                   setShowOccupationModal(false)
                                   setOccupationSearch('')
                                   navigate(`/occupations/${syncedOccupation.id}`)
                                 }}
-                                className="px-3 py-1.5 text-sm rounded-lg whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
+                                style={{ backgroundColor: '#1C826A' }}
                               >
                                 View Details
-                              </button>
+                              </Button>
                             ) : (
-                              <button
+                              <Button
+                                $size="sm"
                                 onClick={() => handleSyncSingleOccupation(occ.faethm_code)}
                                 disabled={isSyncing}
-                                className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap ${
-                                  isSyncing
-                                    ? 'bg-blue-100 text-blue-600'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}
+                                $variant={isSyncing ? 'secondary' : 'primary'}
                               >
                                 {isSyncing ? 'Syncing...' : 'Sync'}
-                              </button>
+                              </Button>
                             )}
-                          </div>
-                        </div>
-                      </div>
+                          </OccupationItemActions>
+                        </OccupationItemHeader>
+                      </OccupationItem>
                     )
                   })}
-                </div>
+                </OccupationList>
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <NoResults>
                   No occupations found for "{occupationSearch}"
-                </div>
+                </NoResults>
               )}
-            </div>
+            </OccupationModalBody>
 
-            <div className="p-4 border-t bg-gray-50">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">
-                  {occupations?.length || 0} occupations currently synced
-                </span>
-                <button
-                  onClick={() => {
-                    setShowOccupationModal(false)
-                    setOccupationSearch('')
-                  }}
-                  className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+            <ModalFooterWithInfo>
+              <ModalFooterInfo>
+                {occupations?.length || 0} occupations currently synced
+              </ModalFooterInfo>
+              <Button
+                $variant="secondary"
+                onClick={() => {
+                  setShowOccupationModal(false)
+                  setOccupationSearch('')
+                }}
+              >
+                Close
+              </Button>
+            </ModalFooterWithInfo>
+          </OccupationModalContainer>
+        </ModalOverlay>
       )}
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Upload Teams CSV</h2>
-                <button
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setUploadResult(null)
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <ModalOverlay>
+          <ModalContent $size="md">
+            <ModalHeader>
+              <ModalTitle>Upload Teams CSV</ModalTitle>
+              <CloseButton
+                onClick={() => {
+                  setShowUploadModal(false)
+                  setUploadResult(null)
+                }}
+              >
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </CloseButton>
+            </ModalHeader>
 
+            <ModalBody>
               {!uploadResult ? (
                 <>
-                  <div className="mb-4">
-                    <h3 className="font-medium text-gray-900 mb-2">CSV Format</h3>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm font-mono overflow-x-auto">
-                      <p className="text-gray-600">name,function,occupation_code,member_count</p>
-                      <p className="text-gray-500">Product Team,Product Management,ADM.ABP,12</p>
-                    </div>
-                  </div>
+                  <FormSection>
+                    <SectionTitle>CSV Format</SectionTitle>
+                    <CodeBlock>
+                      <CodeLine>name,function,occupation_code,member_count</CodeLine>
+                      <CodeLine $subtle>Product Team,Product Management,ADM.ABP,12</CodeLine>
+                    </CodeBlock>
+                  </FormSection>
 
-                  <div className="mb-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Synced Occupation Codes</h3>
+                  <FormSection>
+                    <SectionTitle>Synced Occupation Codes</SectionTitle>
                     {occupations && occupations.length > 0 ? (
-                      <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
-                        <ul className="text-sm space-y-1">
-                          {occupations.slice(0, 20).map(o => (
-                            <li key={o.id} className="text-gray-600">
-                              <span className="font-mono font-medium">{o.faethm_code}</span> - {o.name}
-                            </li>
+                      <OccupationCodesList>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                          {occupations.slice(0, 20).map((o) => (
+                            <OccupationCodeItem key={o.id}>
+                              <OccupationCodeLabel>{o.faethm_code}</OccupationCodeLabel> - {o.name}
+                            </OccupationCodeItem>
                           ))}
                           {occupations.length > 20 && (
-                            <li className="text-gray-400">
+                            <MoreText>
                               ... and {occupations.length - 20} more
-                            </li>
+                            </MoreText>
                           )}
                         </ul>
-                      </div>
+                      </OccupationCodesList>
                     ) : (
-                      <p className="text-sm text-yellow-600">
+                      <WarningText>
                         No occupations synced.{' '}
-                        <button
+                        <SyncLink
                           onClick={() => {
                             setShowUploadModal(false)
                             setShowOccupationModal(true)
                           }}
-                          className="underline"
                         >
                           Browse and sync occupations first
-                        </button>
-                      </p>
+                        </SyncLink>
+                      </WarningText>
                     )}
-                  </div>
+                  </FormSection>
 
-                  <div className="mb-4">
-                    <button
-                      onClick={downloadTemplate}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
+                  <FormSection>
+                    <TemplateLink onClick={downloadTemplate}>
                       Download CSV Template
-                    </button>
-                  </div>
+                    </TemplateLink>
+                  </FormSection>
 
-                  <div className="mb-4">
-                    <label className="flex items-center gap-2">
-                      <input
+                  <FormSection>
+                    <CheckboxLabel>
+                      <Checkbox
                         type="checkbox"
                         checked={updateExisting}
                         onChange={(e) => setUpdateExisting(e.target.checked)}
-                        className="rounded border-gray-300"
                       />
-                      <span className="text-sm text-gray-700">Update existing teams with same name</span>
-                    </label>
-                  </div>
+                      <CheckboxText>Update existing teams with same name</CheckboxText>
+                    </CheckboxLabel>
+                  </FormSection>
 
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <input
+                  <DropZone>
+                    <HiddenInput
                       ref={fileInputRef}
                       type="file"
                       accept=".csv"
                       onChange={handleFileSelect}
-                      className="hidden"
                       id="csv-upload"
                     />
-                    <label
-                      htmlFor="csv-upload"
-                      className="cursor-pointer"
-                    >
-                      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <label htmlFor="csv-upload" style={{ cursor: 'pointer' }}>
+                      <DropZoneIcon stroke="currentColor" fill="none" viewBox="0 0 48 48">
                         <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <p className="mt-2 text-sm text-gray-600">
-                        <span className="text-blue-600 hover:text-blue-500">Click to upload</span> or drag and drop
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">CSV files only</p>
+                      </DropZoneIcon>
+                      <DropZoneText>
+                        <DropZoneLink>Click to upload</DropZoneLink> or drag and drop
+                      </DropZoneText>
+                      <DropZoneHint>CSV files only</DropZoneHint>
                     </label>
-                  </div>
+                  </DropZone>
 
                   {uploadCSV.isPending && (
-                    <div className="mt-4 text-center">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <p className="mt-2 text-sm text-gray-600">Uploading...</p>
-                    </div>
+                    <UploadingContainer>
+                      <Spinner />
+                      <UploadingText>Uploading...</UploadingText>
+                    </UploadingContainer>
                   )}
                 </>
               ) : (
-                <div>
-                  <div className="mb-4">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div className="bg-green-50 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-green-600">{uploadResult.created}</p>
-                        <p className="text-sm text-green-700">Created</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-blue-600">{uploadResult.updated}</p>
-                        <p className="text-sm text-blue-700">Updated</p>
-                      </div>
-                      <div className="bg-red-50 rounded-lg p-3">
-                        <p className="text-2xl font-bold text-red-600">{uploadResult.errors.length}</p>
-                        <p className="text-sm text-red-700">Errors</p>
-                      </div>
-                    </div>
-                  </div>
+                <>
+                  <ResultGrid>
+                    <ResultCard $variant="success">
+                      <ResultNumber $variant="success">{uploadResult.created}</ResultNumber>
+                      <ResultLabel $variant="success">Created</ResultLabel>
+                    </ResultCard>
+                    <ResultCard $variant="info">
+                      <ResultNumber $variant="info">{uploadResult.updated}</ResultNumber>
+                      <ResultLabel $variant="info">Updated</ResultLabel>
+                    </ResultCard>
+                    <ResultCard $variant="error">
+                      <ResultNumber $variant="error">{uploadResult.errors.length}</ResultNumber>
+                      <ResultLabel $variant="error">Errors</ResultLabel>
+                    </ResultCard>
+                  </ResultGrid>
 
                   {uploadResult.errors.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="font-medium text-red-900 mb-2">Errors</h3>
-                      <div className="bg-red-50 rounded-lg p-3 max-h-40 overflow-y-auto">
-                        <ul className="text-sm space-y-1">
+                    <ErrorsSection>
+                      <ErrorsTitle>Errors</ErrorsTitle>
+                      <ErrorsList>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                           {uploadResult.errors.map((err, i) => (
-                            <li key={i} className="text-red-700">
+                            <ErrorItem key={i}>
                               Row {err.row}: {err.error}
-                            </li>
+                            </ErrorItem>
                           ))}
                         </ul>
-                      </div>
-                    </div>
+                      </ErrorsList>
+                    </ErrorsSection>
                   )}
 
                   {uploadResult.teams.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="font-medium text-gray-900 mb-2">Teams Processed</h3>
-                      <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
-                        <ul className="text-sm space-y-1">
+                    <TeamsSection>
+                      <TeamsTitle>Teams Processed</TeamsTitle>
+                      <TeamsList>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                           {uploadResult.teams.map((team) => (
-                            <li key={team.id} className="text-gray-700">
+                            <TeamItem key={team.id}>
                               {team.name} ({team.function}) - {team.member_count} members
-                            </li>
+                            </TeamItem>
                           ))}
                         </ul>
-                      </div>
-                    </div>
+                      </TeamsList>
+                    </TeamsSection>
                   )}
 
-                  <div className="flex gap-2">
-                    <button
+                  <Flex $gap="spacingSM">
+                    <Button
+                      $variant="secondary"
+                      $fullWidth
                       onClick={() => setUploadResult(null)}
-                      className="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                     >
                       Upload Another
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      $fullWidth
                       onClick={() => {
                         setShowUploadModal(false)
                         setUploadResult(null)
                       }}
-                      className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Done
-                    </button>
-                  </div>
-                </div>
+                    </Button>
+                  </Flex>
+                </>
               )}
-            </div>
-          </div>
-        </div>
+            </ModalBody>
+          </ModalContent>
+        </ModalOverlay>
       )}
-    </div>
+    </PageContainer>
   )
 }

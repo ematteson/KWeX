@@ -1,3 +1,4 @@
+import styled from 'styled-components'
 import {
   LineChart,
   Line,
@@ -9,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { MetricResult } from '../api/types'
+import { Card, Heading, Text } from '../design-system/components'
 
 interface MetricsTrendChartProps {
   data: MetricResult[]
@@ -29,36 +31,105 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Styled Components
+const ChartCard = styled(Card)`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const ChartHeader = styled.div`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ChartContainer = styled.div`
+  height: 256px;
+`
+
+const LoadingContainer = styled.div`
+  height: 256px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const LoadingPlaceholder = styled.div`
+  width: 100%;
+  height: 100%;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+`
+
+const EmptyContainer = styled.div`
+  height: 256px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const EmptyContent = styled.div`
+  text-align: center;
+`
+
+const ChartFooter = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const FooterNote = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  text-align: center;
+  margin: 0;
+`
+
+// Use Fredly chart colors from the theme
 const METRIC_COLORS = {
-  flow: '#047857',      // Pearson green (emerald-700)
-  friction: '#DC2626',  // Red for friction (higher is worse)
-  safety: '#2563EB',    // Blue
-  portfolio: '#7C3AED', // Purple
+  flow: '#1C826A',      // Success green
+  friction: '#C53312',  // Error red (higher is worse)
+  safety: '#245FA8',    // Info blue
+  portfolio: '#5B4599', // Help purple
 }
 
 export function MetricsTrendChart({ data, isLoading }: MetricsTrendChartProps) {
   if (isLoading) {
     return (
-      <div className="card">
-        <h3 className="card-header">Metrics Trends</h3>
-        <div className="h-64 flex items-center justify-center">
-          <div className="animate-pulse bg-pearson-gray-200 rounded w-full h-full"></div>
-        </div>
-      </div>
+      <ChartCard>
+        <ChartHeader>
+          <Heading $level={4}>Metrics Trends</Heading>
+        </ChartHeader>
+        <LoadingContainer>
+          <LoadingPlaceholder />
+        </LoadingContainer>
+      </ChartCard>
     )
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className="card">
-        <h3 className="card-header">Metrics Trends</h3>
-        <div className="h-64 flex items-center justify-center text-pearson-gray-500">
-          <div className="text-center">
-            <p>No historical data available yet.</p>
-            <p className="text-sm mt-1">Trends will appear after multiple survey cycles.</p>
-          </div>
-        </div>
-      </div>
+      <ChartCard>
+        <ChartHeader>
+          <Heading $level={4}>Metrics Trends</Heading>
+        </ChartHeader>
+        <EmptyContainer>
+          <EmptyContent>
+            <Text>No historical data available yet.</Text>
+            <Text $variant="bodySmall" $color="subtle" style={{ marginTop: '0.25rem' }}>
+              Trends will appear after multiple survey cycles.
+            </Text>
+          </EmptyContent>
+        </EmptyContainer>
+      </ChartCard>
     )
   }
 
@@ -75,34 +146,36 @@ export function MetricsTrendChart({ data, isLoading }: MetricsTrendChartProps) {
     }))
 
   return (
-    <div className="card">
-      <h3 className="card-header">Metrics Trends</h3>
-      <div className="h-64">
+    <ChartCard>
+      <ChartHeader>
+        <Heading $level={4}>Metrics Trends</Heading>
+      </ChartHeader>
+      <ChartContainer>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
             margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E6E6E6" />
             <XAxis
               dataKey="displayDate"
-              tick={{ fontSize: 12, fill: '#6B7280' }}
-              tickLine={{ stroke: '#E5E7EB' }}
-              axisLine={{ stroke: '#E5E7EB' }}
+              tick={{ fontSize: 12, fill: '#737373' }}
+              tickLine={{ stroke: '#E6E6E6' }}
+              axisLine={{ stroke: '#E6E6E6' }}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 12, fill: '#6B7280' }}
-              tickLine={{ stroke: '#E5E7EB' }}
-              axisLine={{ stroke: '#E5E7EB' }}
+              tick={{ fontSize: 12, fill: '#737373' }}
+              tickLine={{ stroke: '#E6E6E6' }}
+              axisLine={{ stroke: '#E6E6E6' }}
               width={40}
             />
             <Tooltip
               contentStyle={{
                 backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
+                border: '1px solid #E6E6E6',
                 borderRadius: '8px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                boxShadow: '0px 6px 10px rgba(0, 0, 0, 0.11)',
               }}
               labelStyle={{ fontWeight: 600, marginBottom: 4 }}
             />
@@ -152,12 +225,12 @@ export function MetricsTrendChart({ data, isLoading }: MetricsTrendChartProps) {
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-      <div className="mt-4 pt-4 border-t border-pearson-gray-100">
-        <p className="text-xs text-pearson-gray-500 text-center">
+      </ChartContainer>
+      <ChartFooter>
+        <FooterNote>
           Higher is better for Flow, Safety, and Portfolio Balance. Lower is better for Friction.
-        </p>
-      </div>
-    </div>
+        </FooterNote>
+      </ChartFooter>
+    </ChartCard>
   )
 }

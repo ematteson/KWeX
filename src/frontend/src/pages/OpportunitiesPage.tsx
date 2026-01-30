@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import clsx from 'clsx'
+import styled, { css, keyframes } from 'styled-components'
 import { useTeam, useTeamOpportunities, useUpdateOpportunity } from '../api/hooks'
 import { OpportunityCard } from '../components/OpportunityCard'
 import type { OpportunityStatus } from '../api/types'
@@ -12,6 +12,194 @@ const STATUS_TABS: { value: OpportunityStatus | 'all'; label: string }[] = [
   { value: 'completed', label: 'Completed' },
   { value: 'deferred', label: 'Deferred' },
 ]
+
+// Styled Components
+const PageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const HeaderSection = styled.div``
+
+const BackLink = styled(Link)`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.link.brand.default};
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingSM};
+
+  &:hover {
+    text-decoration: underline;
+    color: ${({ theme }) => theme.v1.semanticColors.text.link.brand.hover};
+  }
+`
+
+const PageTitle = styled.h1`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const TeamName = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyL};
+`
+
+const TabsContainer = styled.div`
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const TabsNav = styled.nav`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  margin-bottom: -1px;
+`
+
+const TabButton = styled.button<{ $active: boolean }>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingXS};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  ${({ $active, theme }) =>
+    $active
+      ? css`
+          border-bottom-color: ${theme.v1.semanticColors.border.brand.default};
+          color: ${theme.v1.semanticColors.text.accent.primary};
+        `
+      : css`
+          color: ${theme.v1.semanticColors.text.body.default};
+
+          &:hover {
+            color: ${theme.v1.semanticColors.text.heading.bold};
+            border-bottom-color: ${theme.v1.semanticColors.border.neutral.dark};
+          }
+        `}
+`
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const LoadingCard = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+  animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+`
+
+const SkeletonLine = styled.div<{ $width: string; $height: string }>`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  width: ${({ $width }) => $width};
+  height: ${({ $height }) => $height};
+
+  & + & {
+    margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  }
+`
+
+const OpportunitiesList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing5XL} 0;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const EmptyStateIcon = styled.svg`
+  width: 3rem;
+  height: 3rem;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.neutral.light};
+  margin: 0 auto ${({ theme }) => theme.v1.spacing.spacingLG};
+  display: block;
+`
+
+const EmptyStateTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const EmptyStateDescription = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  max-width: 28rem;
+  margin: 0 auto;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const InfoCard = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const InfoCardTitle = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyL};
+`
+
+const InfoCardDescription = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const RiceGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+`
+
+const RiceItem = styled.div``
+
+const RiceLabel = styled.span`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  display: block;
+`
+
+const RiceDescription = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: 0;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const RiceFormula = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: ${({ theme }) => theme.v1.spacing.spacingMD} 0 0 0;
+`
 
 export function OpportunitiesPage() {
   const { teamId } = useParams<{ teamId: string }>()
@@ -36,53 +224,44 @@ export function OpportunitiesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       {/* Header */}
-      <div>
-        <Link to={`/teams/${teamId}`} className="text-sm text-pearson-blue hover:underline mb-2 inline-block">
+      <HeaderSection>
+        <BackLink to={`/teams/${teamId}`}>
           ← Back to Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold text-pearson-gray-900">
-          Improvement Opportunities
-        </h1>
-        {team && (
-          <p className="text-pearson-gray-600 mt-1">{team.name}</p>
-        )}
-      </div>
+        </BackLink>
+        <PageTitle>Improvement Opportunities</PageTitle>
+        {team && <TeamName>{team.name}</TeamName>}
+      </HeaderSection>
 
       {/* Status filter tabs */}
-      <div className="border-b border-pearson-gray-200">
-        <nav className="flex gap-4 -mb-px">
+      <TabsContainer>
+        <TabsNav>
           {STATUS_TABS.map((tab) => (
-            <button
+            <TabButton
               key={tab.value}
               onClick={() => setStatusFilter(tab.value)}
-              className={clsx(
-                'py-2 px-1 text-sm font-medium border-b-2 transition-colors',
-                statusFilter === tab.value
-                  ? 'border-pearson-blue text-pearson-blue'
-                  : 'border-transparent text-pearson-gray-600 hover:text-pearson-gray-900 hover:border-pearson-gray-300'
-              )}
+              $active={statusFilter === tab.value}
             >
               {tab.label}
-            </button>
+            </TabButton>
           ))}
-        </nav>
-      </div>
+        </TabsNav>
+      </TabsContainer>
 
       {/* Opportunities list */}
       {oppsLoading ? (
-        <div className="space-y-4">
+        <LoadingContainer>
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="h-5 bg-pearson-gray-200 rounded w-64 mb-3"></div>
-              <div className="h-4 bg-pearson-gray-200 rounded w-full mb-2"></div>
-              <div className="h-4 bg-pearson-gray-200 rounded w-3/4"></div>
-            </div>
+            <LoadingCard key={i}>
+              <SkeletonLine $width="16rem" $height="1.25rem" />
+              <SkeletonLine $width="100%" $height="1rem" />
+              <SkeletonLine $width="75%" $height="1rem" />
+            </LoadingCard>
           ))}
-        </div>
+        </LoadingContainer>
       ) : opportunities && opportunities.length > 0 ? (
-        <div className="space-y-4">
+        <OpportunitiesList>
           {opportunities.map((opportunity) => (
             <OpportunityCard
               key={opportunity.id}
@@ -90,51 +269,51 @@ export function OpportunitiesPage() {
               onStatusChange={(newStatus) => handleStatusChange(opportunity.id, newStatus)}
             />
           ))}
-        </div>
+        </OpportunitiesList>
       ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-pearson-gray-200">
-          <svg className="w-12 h-12 text-pearson-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <EmptyState>
+          <EmptyStateIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-          <h2 className="text-lg font-medium text-pearson-gray-900 mb-2">
+          </EmptyStateIcon>
+          <EmptyStateTitle>
             {statusFilter === 'all' ? 'No opportunities found' : `No ${statusFilter.replace('_', ' ')} opportunities`}
-          </h2>
-          <p className="text-pearson-gray-600 max-w-md mx-auto">
+          </EmptyStateTitle>
+          <EmptyStateDescription>
             {statusFilter === 'all'
               ? 'Complete a survey to generate improvement opportunities based on team feedback.'
               : 'Opportunities will appear here as they move through the workflow.'}
-          </p>
-        </div>
+          </EmptyStateDescription>
+        </EmptyState>
       )}
 
       {/* RICE Score explanation */}
-      <div className="card bg-pearson-gray-50">
-        <h3 className="font-medium text-pearson-gray-800 mb-2">About RICE Scoring</h3>
-        <p className="text-sm text-pearson-gray-600 mb-3">
+      <InfoCard>
+        <InfoCardTitle>About RICE Scoring</InfoCardTitle>
+        <InfoCardDescription>
           Opportunities are prioritized using the RICE framework:
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="font-medium text-pearson-gray-700">Reach</span>
-            <p className="text-pearson-gray-500">Team members affected</p>
-          </div>
-          <div>
-            <span className="font-medium text-pearson-gray-700">Impact</span>
-            <p className="text-pearson-gray-500">Potential improvement</p>
-          </div>
-          <div>
-            <span className="font-medium text-pearson-gray-700">Confidence</span>
-            <p className="text-pearson-gray-500">Data reliability</p>
-          </div>
-          <div>
-            <span className="font-medium text-pearson-gray-700">Effort</span>
-            <p className="text-pearson-gray-500">Implementation time</p>
-          </div>
-        </div>
-        <p className="text-xs text-pearson-gray-500 mt-3">
-          RICE Score = (Reach × Impact × Confidence) / Effort
-        </p>
-      </div>
-    </div>
+        </InfoCardDescription>
+        <RiceGrid>
+          <RiceItem>
+            <RiceLabel>Reach</RiceLabel>
+            <RiceDescription>Team members affected</RiceDescription>
+          </RiceItem>
+          <RiceItem>
+            <RiceLabel>Impact</RiceLabel>
+            <RiceDescription>Potential improvement</RiceDescription>
+          </RiceItem>
+          <RiceItem>
+            <RiceLabel>Confidence</RiceLabel>
+            <RiceDescription>Data reliability</RiceDescription>
+          </RiceItem>
+          <RiceItem>
+            <RiceLabel>Effort</RiceLabel>
+            <RiceDescription>Implementation time</RiceDescription>
+          </RiceItem>
+        </RiceGrid>
+        <RiceFormula>
+          RICE Score = (Reach x Impact x Confidence) / Effort
+        </RiceFormula>
+      </InfoCard>
+    </PageContainer>
   )
 }

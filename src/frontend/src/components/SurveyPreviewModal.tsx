@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
+import styled from 'styled-components'
 import type { Survey, Question } from '../api/types'
+import {
+  ModalOverlay,
+  ModalContent,
+  Button,
+  Heading,
+  Text,
+} from '../design-system/components'
 
 interface SurveyPreviewModalProps {
   survey: Survey
@@ -34,52 +42,216 @@ function getDefaultOptions(type: string): string[] {
   return []
 }
 
+// Styled Components
+const ModalContentStyled = styled(ModalContent)`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+`
+
+const HeaderSection = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const HeaderContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+`
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS};
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  transition: color 0.2s;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  }
+`
+
+const ActionBar = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} ${({ theme }) => theme.v1.spacing.spacingXL};
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  flex-wrap: wrap;
+`
+
+const DimensionSummary = styled.div`
+  margin-left: auto;
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  align-items: center;
+`
+
+const DimensionLabel = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const DimensionBadge = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  text-transform: capitalize;
+`
+
+const ScrollableBody = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const QuestionsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const QuestionCard = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+`
+
+const QuestionMeta = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const QuestionDimension = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.info.default};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.info.subtle};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  text-transform: capitalize;
+`
+
+const QuestionType = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const QuestionText = styled.p`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const OptionsContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const OptionBadge = styled.span`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingMD};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+`
+
+const SliderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const SliderTrack = styled.div`
+  flex: 1;
+  height: 8px;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+`
+
+const FreeTextPlaceholder = styled.div`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  font-style: italic;
+`
+
+const FooterSection = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const FooterNote = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  text-align: center;
+  margin: 0;
+`
+
+const CopySuccessButton = styled(Button)`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.success.bold};
+
+  &:hover:not(:disabled) {
+    background-color: ${({ theme }) => theme.v1.colors.status.green[700]};
+  }
+`
+
 function QuestionPreview({ question, index }: { question: Question; index: number }) {
   const options = question.options?.choices || getDefaultOptions(question.type)
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-      <div className="flex items-start justify-between mb-2">
-        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded capitalize">
+    <QuestionCard>
+      <QuestionMeta>
+        <QuestionDimension>
           {question.dimension.replace('_', ' ')}
-        </span>
-        <span className="text-xs text-gray-400">
+        </QuestionDimension>
+        <QuestionType>
           {getQuestionTypeLabel(question.type)}
-        </span>
-      </div>
+        </QuestionType>
+      </QuestionMeta>
 
-      <p className="font-medium text-gray-900 mb-3">
+      <QuestionText>
         {index + 1}. {question.text}
-      </p>
+      </QuestionText>
 
       {/* Show answer options */}
       {(question.type === 'likert_5' || question.type === 'likert_7') && (
-        <div className="flex flex-wrap gap-2">
+        <OptionsContainer>
           {options.map((option, i) => (
-            <span
-              key={i}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full"
-            >
+            <OptionBadge key={i}>
               {i + 1}. {option}
-            </span>
+            </OptionBadge>
           ))}
-        </div>
+        </OptionsContainer>
       )}
 
       {question.type === 'percentage_slider' && (
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+        <SliderContainer>
           <span>{question.options?.low_label || '0%'}</span>
-          <div className="flex-1 h-2 bg-gray-200 rounded-full" />
+          <SliderTrack />
           <span>{question.options?.high_label || '100%'}</span>
-        </div>
+        </SliderContainer>
       )}
 
       {question.type === 'free_text' && (
-        <div className="border border-gray-200 rounded p-3 bg-gray-50 text-sm text-gray-400 italic">
+        <FreeTextPlaceholder>
           Free text response...
-        </div>
+        </FreeTextPlaceholder>
       )}
-    </div>
+    </QuestionCard>
   )
 }
 
@@ -146,80 +318,76 @@ export function SurveyPreviewModal({ survey, isOpen, onClose }: SurveyPreviewMod
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-gray-50 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalOverlay onClick={onClose}>
+      <ModalContentStyled $size="lg" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
         {/* Header */}
-        <div className="bg-white p-6 border-b flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">{survey.name}</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {sortedQuestions.length} questions | ~{survey.estimated_completion_minutes} min to complete
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        <HeaderSection>
+          <HeaderContent>
+            <div>
+              <Heading $level={3}>{survey.name}</Heading>
+              <Text $variant="bodySmall" $color="subtle" style={{ marginTop: '0.25rem' }}>
+                {sortedQuestions.length} questions | ~{survey.estimated_completion_minutes} min to complete
+              </Text>
+            </div>
+            <CloseButton onClick={onClose}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </CloseButton>
+          </HeaderContent>
+        </HeaderSection>
 
         {/* Action Bar */}
-        <div className="bg-white px-6 py-3 border-b flex gap-2 flex-wrap">
-          <button
-            onClick={handleCopyText}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-            </svg>
-            {copyStatus === 'copied' ? 'Copied!' : 'Copy as Text'}
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <ActionBar>
+          {copyStatus === 'copied' ? (
+            <CopySuccessButton $size="sm">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Copied!
+            </CopySuccessButton>
+          ) : (
+            <Button $size="sm" onClick={handleCopyText}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy as Text
+            </Button>
+          )}
+          <Button $size="sm" $variant="secondary" onClick={() => window.print()}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
             Print
-          </button>
+          </Button>
 
           {/* Dimension summary */}
-          <div className="ml-auto flex gap-2 items-center">
-            <span className="text-sm text-gray-500">Dimensions:</span>
+          <DimensionSummary>
+            <DimensionLabel>Dimensions:</DimensionLabel>
             {Object.keys(groupedQuestions).map(dim => (
-              <span key={dim} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded capitalize">
+              <DimensionBadge key={dim}>
                 {dim.replace('_', ' ')} ({groupedQuestions[dim].length})
-              </span>
+              </DimensionBadge>
             ))}
-          </div>
-        </div>
+          </DimensionSummary>
+        </ActionBar>
 
         {/* Questions List */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
+        <ScrollableBody>
+          <QuestionsList>
             {sortedQuestions.map((question, index) => (
               <QuestionPreview key={question.id} question={question} index={index} />
             ))}
-          </div>
-        </div>
+          </QuestionsList>
+        </ScrollableBody>
 
         {/* Footer */}
-        <div className="bg-white p-4 border-t">
-          <p className="text-xs text-gray-500 text-center">
+        <FooterSection>
+          <FooterNote>
             Responses are anonymous and will be aggregated with at least 6 others before being visible.
-          </p>
-        </div>
-      </div>
-    </div>
+          </FooterNote>
+        </FooterSection>
+      </ModalContentStyled>
+    </ModalOverlay>
   )
 }

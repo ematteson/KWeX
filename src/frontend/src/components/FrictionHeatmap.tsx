@@ -1,4 +1,4 @@
-import clsx from 'clsx'
+import styled from 'styled-components'
 import type { FrictionDimension } from '../api/hooks'
 
 interface FrictionHeatmapProps {
@@ -7,14 +7,209 @@ interface FrictionHeatmapProps {
   isLoading?: boolean
 }
 
+// Styled Components
+const HeatmapCard = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const CardHeader = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const HeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const HeaderTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const OverallScoreWrapper = styled.div`
+  text-align: right;
+`
+
+const OverallScoreLabel = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const OverallScoreValue = styled.span`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+`
+
+const HeatmapGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`
+
+const SkeletonCell = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  height: 96px;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`
+
+const EmptyStateWrapper = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const EmptyStateText = styled.p`
+  margin: 0;
+`
+
+const EmptyStateSubtext = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+interface HeatmapCellProps {
+  $bgColor: string
+}
+
+const HeatmapCell = styled.div<HeatmapCellProps>`
+  position: relative;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  transition: transform 0.2s ease;
+  cursor: default;
+  background-color: ${({ $bgColor }) => $bgColor};
+
+  &:hover {
+    transform: scale(1.05);
+  }
+`
+
+interface CellTextProps {
+  $textColor: string
+}
+
+const ScoreValue = styled.div<CellTextProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ $textColor }) => $textColor};
+`
+
+const DimensionLabel = styled.div<CellTextProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  opacity: 0.9;
+  color: ${({ $textColor }) => $textColor};
+`
+
+const ScoreLabel = styled.div<CellTextProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  opacity: 0.75;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+  color: ${({ $textColor }) => $textColor};
+`
+
+const LegendWrapper = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const LegendRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const LegendItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+interface LegendColorBoxProps {
+  $color: string
+}
+
+const LegendColorBox = styled.div<LegendColorBoxProps>`
+  width: 12px;
+  height: 12px;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  background-color: ${({ $color }) => $color};
+`
+
+const DetailsSection = styled.details`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const DetailsSummary = styled.summary`
+  cursor: pointer;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  }
+`
+
+const DescriptionsList = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+`
+
+const DescriptionItem = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const DescriptionLabel = styled.span`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  width: 80px;
+  flex-shrink: 0;
+`
+
+// Color constants for heatmap
+const HEATMAP_COLORS = {
+  highFriction: { bg: '#ef4444', text: '#ffffff' },      // High friction - bad (red)
+  mediumHigh: { bg: '#f97316', text: '#ffffff' },        // Medium-high friction (orange)
+  medium: { bg: '#fbbf24', text: '#78350f' },            // Medium friction (amber)
+  lowMedium: { bg: '#a3e635', text: '#365314' },         // Low-medium friction (lime)
+  low: { bg: '#22c55e', text: '#ffffff' },               // Low friction - good (green)
+}
+
 function getScoreColor(score: number): { bg: string; text: string } {
   // For friction, lower is BETTER (less friction)
   // So we invert: high score = red (bad), low score = green (good)
-  if (score >= 75) return { bg: 'bg-red-500', text: 'text-white' }         // High friction - bad
-  if (score >= 60) return { bg: 'bg-orange-500', text: 'text-white' }      // Medium-high friction
-  if (score >= 40) return { bg: 'bg-amber-400', text: 'text-amber-900' }   // Medium friction
-  if (score >= 25) return { bg: 'bg-lime-400', text: 'text-lime-900' }     // Low-medium friction
-  return { bg: 'bg-green-500', text: 'text-white' }                         // Low friction - good
+  if (score >= 75) return HEATMAP_COLORS.highFriction
+  if (score >= 60) return HEATMAP_COLORS.mediumHigh
+  if (score >= 40) return HEATMAP_COLORS.medium
+  if (score >= 25) return HEATMAP_COLORS.lowMedium
+  return HEATMAP_COLORS.low
 }
 
 function getScoreLabel(score: number): string {
@@ -28,94 +223,87 @@ function getScoreLabel(score: number): string {
 export function FrictionHeatmap({ dimensions, overallScore, isLoading }: FrictionHeatmapProps) {
   if (isLoading) {
     return (
-      <div className="card">
-        <h3 className="card-header">Friction Heatmap</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <HeatmapCard>
+        <CardHeader>Friction Heatmap</CardHeader>
+        <HeatmapGrid>
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="animate-pulse bg-pearson-gray-200 rounded-lg h-24"></div>
+            <SkeletonCell key={i} />
           ))}
-        </div>
-      </div>
+        </HeatmapGrid>
+      </HeatmapCard>
     )
   }
 
   if (!dimensions || dimensions.length === 0) {
     return (
-      <div className="card">
-        <h3 className="card-header">Friction Heatmap</h3>
-        <div className="text-center py-8 text-pearson-gray-500">
-          <p>No friction data available yet.</p>
-          <p className="text-sm mt-1">Complete a survey to see friction breakdown by dimension.</p>
-        </div>
-      </div>
+      <HeatmapCard>
+        <CardHeader>Friction Heatmap</CardHeader>
+        <EmptyStateWrapper>
+          <EmptyStateText>No friction data available yet.</EmptyStateText>
+          <EmptyStateSubtext>Complete a survey to see friction breakdown by dimension.</EmptyStateSubtext>
+        </EmptyStateWrapper>
+      </HeatmapCard>
     )
   }
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="card-header mb-0">Friction Heatmap</h3>
+    <HeatmapCard>
+      <HeaderRow>
+        <HeaderTitle>Friction Heatmap</HeaderTitle>
         {overallScore !== undefined && (
-          <div className="text-right">
-            <span className="text-sm text-pearson-gray-500">Overall: </span>
-            <span className="font-semibold text-pearson-gray-800">{Math.round(overallScore)}</span>
-          </div>
+          <OverallScoreWrapper>
+            <OverallScoreLabel>Overall: </OverallScoreLabel>
+            <OverallScoreValue>{Math.round(overallScore)}</OverallScoreValue>
+          </OverallScoreWrapper>
         )}
-      </div>
+      </HeaderRow>
 
       {/* Heatmap grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <HeatmapGrid>
         {dimensions.map((dim) => {
           const colors = getScoreColor(dim.score)
           return (
-            <div
+            <HeatmapCell
               key={dim.dimension}
-              className={clsx(
-                'relative rounded-lg p-4 transition-all hover:scale-105 cursor-default',
-                colors.bg
-              )}
+              $bgColor={colors.bg}
               title={dim.description}
             >
-              <div className={colors.text}>
-                <div className="text-2xl font-bold">{Math.round(dim.score)}</div>
-                <div className="text-sm font-medium opacity-90">{dim.label}</div>
-                <div className="text-xs opacity-75 mt-1">{getScoreLabel(dim.score)}</div>
-              </div>
-            </div>
+              <ScoreValue $textColor={colors.text}>{Math.round(dim.score)}</ScoreValue>
+              <DimensionLabel $textColor={colors.text}>{dim.label}</DimensionLabel>
+              <ScoreLabel $textColor={colors.text}>{getScoreLabel(dim.score)}</ScoreLabel>
+            </HeatmapCell>
           )
         })}
-      </div>
+      </HeatmapGrid>
 
       {/* Legend */}
-      <div className="mt-4 pt-4 border-t border-pearson-gray-100">
-        <div className="flex items-center justify-between text-xs text-pearson-gray-500">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-green-500"></div>
-              <span>Low Friction (Good)</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-red-500"></div>
+      <LegendWrapper>
+        <LegendRow>
+          <LegendItem>
+            <LegendColorBox $color={HEATMAP_COLORS.low.bg} />
+            <span>Low Friction (Good)</span>
+          </LegendItem>
+          <LegendItem>
+            <LegendColorBox $color={HEATMAP_COLORS.highFriction.bg} />
             <span>High Friction (Needs Attention)</span>
-          </div>
-        </div>
-      </div>
+          </LegendItem>
+        </LegendRow>
+      </LegendWrapper>
 
       {/* Dimension descriptions */}
-      <details className="mt-4 text-sm">
-        <summary className="cursor-pointer text-pearson-gray-500 hover:text-pearson-gray-700">
+      <DetailsSection>
+        <DetailsSummary>
           View dimension descriptions
-        </summary>
-        <div className="mt-2 space-y-2 text-xs text-pearson-gray-600">
+        </DetailsSummary>
+        <DescriptionsList>
           {dimensions.map((dim) => (
-            <div key={dim.dimension} className="flex gap-2">
-              <span className="font-medium w-20 shrink-0">{dim.label}:</span>
+            <DescriptionItem key={dim.dimension}>
+              <DescriptionLabel>{dim.label}:</DescriptionLabel>
               <span>{dim.description}</span>
-            </div>
+            </DescriptionItem>
           ))}
-        </div>
-      </details>
-    </div>
+        </DescriptionsList>
+      </DetailsSection>
+    </HeatmapCard>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import styled, { css } from 'styled-components'
 import {
   useOccupation,
   useOccupationTasks,
@@ -16,11 +17,431 @@ const CATEGORY_LABELS: Record<TaskCategory, string> = {
   admin: 'Admin',
 }
 
-const CATEGORY_COLORS: Record<TaskCategory, string> = {
-  core: 'bg-blue-100 text-blue-800',
-  support: 'bg-green-100 text-green-800',
-  admin: 'bg-gray-100 text-gray-800',
+// Styled Components
+const PageWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const Breadcrumb = styled.nav`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const BreadcrumbLink = styled(Link)`
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  }
+`
+
+const BreadcrumbSeparator = styled.span`
+  margin: 0 ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const BreadcrumbCurrent = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+`
+
+const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const HeaderContent = styled.div``
+
+const PageTitle = styled.h1`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const FaethmCode = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-family: monospace;
+  color: ${({ theme }) => theme.v1.semanticColors.text.accent.primary};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+`
+
+const Description = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: ${({ theme }) => theme.v1.spacing.spacingSM} 0 0 0;
+  max-width: 672px;
+`
+
+interface ButtonProps {
+  $variant?: 'primary' | 'secondary' | 'success'
 }
+
+const Button = styled.button<ButtonProps>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  border: none;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  padding: ${({ theme }) => theme.v1.spacing.spacingSM} ${({ theme }) => theme.v1.spacing.spacingLG};
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  ${({ $variant = 'primary', theme }) => {
+    switch ($variant) {
+      case 'secondary':
+        return css`
+          background-color: transparent;
+          color: ${theme.v1.semanticColors.text.action.default};
+          border: 1px solid ${theme.v1.semanticColors.border.brand.default};
+          &:hover:not(:disabled) {
+            background-color: ${theme.v1.semanticColors.fill.highlight.brand.default};
+          }
+        `
+      case 'success':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.success.bold};
+          color: ${theme.v1.semanticColors.text.inverse};
+          &:hover:not(:disabled) {
+            opacity: 0.9;
+          }
+        `
+      default:
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.action.brand.default};
+          color: ${theme.v1.semanticColors.text.inverse};
+          &:hover:not(:disabled) {
+            background-color: ${theme.v1.semanticColors.fill.action.brand.hover};
+          }
+        `
+    }
+  }}
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+    cursor: not-allowed;
+  }
+`
+
+const Card = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.sm};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXL};
+`
+
+const CardTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const CardHeaderRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const PortfolioGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+interface PortfolioItemProps {
+  $variant: 'run' | 'change'
+}
+
+const PortfolioItem = styled.div<PortfolioItemProps>`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+
+  ${({ $variant, theme }) => $variant === 'run'
+    ? css`background-color: ${theme.v1.semanticColors.fill.feedback.info.subtle};`
+    : css`background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};`
+  }
+`
+
+const PortfolioValue = styled.p<PortfolioItemProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleL};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+  margin: 0;
+
+  ${({ $variant, theme }) => $variant === 'run'
+    ? css`color: ${theme.v1.semanticColors.text.feedback.info.vibrant};`
+    : css`color: ${theme.v1.semanticColors.text.feedback.success.vibrant};`
+  }
+`
+
+const PortfolioLabel = styled.p<PortfolioItemProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+
+  ${({ $variant, theme }) => $variant === 'run'
+    ? css`color: ${theme.v1.semanticColors.text.feedback.info.default};`
+    : css`color: ${theme.v1.semanticColors.text.feedback.success.default};`
+  }
+`
+
+const TaskBadgesRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+`
+
+const TaskCountBadge = styled.span`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+`
+
+interface AllocationBadgeProps {
+  $status: 'over' | 'exact' | 'under'
+}
+
+const AllocationBadge = styled.span<AllocationBadgeProps>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+
+  ${({ $status, theme }) => {
+    switch ($status) {
+      case 'over':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.error.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.error.default};
+        `
+      case 'exact':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.success.default};
+        `
+      default:
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.warning.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.warning.default};
+        `
+    }
+  }}
+`
+
+const SpinnerWrapper = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+`
+
+const Spinner = styled.div`
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.light};
+  border-top-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+`
+
+const TasksList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const TaskItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+`
+
+const TaskItemLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+interface CategoryBadgeProps {
+  $category: TaskCategory
+}
+
+const CategoryBadge = styled.span<CategoryBadgeProps>`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+
+  ${({ $category, theme }) => {
+    switch ($category) {
+      case 'core':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.info.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.info.default};
+        `
+      case 'support':
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.feedback.success.subtle};
+          color: ${theme.v1.semanticColors.text.feedback.success.default};
+        `
+      default:
+        return css`
+          background-color: ${theme.v1.semanticColors.fill.neutral.light};
+          color: ${theme.v1.semanticColors.text.body.default};
+        `
+    }
+  }}
+`
+
+const TaskName = styled.span`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+`
+
+const CustomBadge = styled.span`
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.help.subtle};
+  color: ${({ theme }) => theme.v1.semanticColors.text.feedback.help.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+`
+
+interface PercentageValueProps {
+  $hasValue: boolean
+}
+
+const PercentageValue = styled.span<PercentageValueProps>`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme, $hasValue }) =>
+    $hasValue
+      ? theme.v1.semanticColors.text.heading.bold
+      : theme.v1.semanticColors.text.body.subtle
+  };
+`
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const EmptyStateText = styled.p`
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const EmptyStateActions = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const TeamsGrid = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+  grid-template-columns: 1fr;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`
+
+const TeamLink = styled(Link)`
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.dark};
+  }
+`
+
+const TeamName = styled.h3`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const TeamFunction = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0;
+`
+
+const TeamMemberCount = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin: ${({ theme }) => theme.v1.spacing.spacingXS} 0 0 0;
+`
+
+const CenteredText = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+  margin: 0;
+`
+
+// Loading skeleton
+const SkeletonBlock = styled.div<{ $height?: string; $width?: string }>`
+  height: ${({ $height = '16px' }) => $height};
+  width: ${({ $width = '100%' }) => $width};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.skeleton};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusSM};
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`
+
+const LoadingStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+// Error state
+const ErrorWrapper = styled.div`
+  text-align: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacing5XL} 0;
+`
+
+const ErrorTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const ErrorText = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG} 0;
+`
+
+const ErrorLink = styled(Link)`
+  color: ${({ theme }) => theme.v1.semanticColors.text.action.default};
+
+  &:hover {
+    color: ${({ theme }) => theme.v1.semanticColors.text.action.hover};
+  }
+`
 
 export function OccupationDetailPage() {
   const { occupationId } = useParams<{ occupationId: string }>()
@@ -47,185 +468,171 @@ export function OccupationDetailPage() {
 
   if (loadingOccupation) {
     return (
-      <div className="space-y-4">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="h-32 bg-gray-200 rounded mb-6"></div>
-          <div className="h-48 bg-gray-200 rounded"></div>
-        </div>
-      </div>
+      <LoadingStack>
+        <SkeletonBlock $height="32px" $width="33%" />
+        <SkeletonBlock $height="16px" $width="25%" />
+        <SkeletonBlock $height="128px" />
+        <SkeletonBlock $height="192px" />
+      </LoadingStack>
     )
   }
 
   if (error || !occupation) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Occupation not found</h2>
-        <p className="text-gray-600 mb-4">The occupation you're looking for doesn't exist.</p>
-        <Link to="/teams" className="text-blue-600 hover:text-blue-800">
+      <ErrorWrapper>
+        <ErrorTitle>Occupation not found</ErrorTitle>
+        <ErrorText>The occupation you're looking for doesn't exist.</ErrorText>
+        <ErrorLink to="/teams">
           Back to Teams
-        </Link>
-      </div>
+        </ErrorLink>
+      </ErrorWrapper>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <PageWrapper>
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500">
-        <Link to="/teams" className="hover:text-gray-700">
+      <Breadcrumb>
+        <BreadcrumbLink to="/teams">
           Teams
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">{occupation.name}</span>
-      </nav>
+        </BreadcrumbLink>
+        <BreadcrumbSeparator>/</BreadcrumbSeparator>
+        <BreadcrumbCurrent>{occupation.name}</BreadcrumbCurrent>
+      </Breadcrumb>
 
       {/* Header */}
-      <div className="flex justify-between items-start flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{occupation.name}</h1>
+      <Header>
+        <HeaderContent>
+          <PageTitle>{occupation.name}</PageTitle>
           {occupation.faethm_code && (
-            <p className="text-sm font-mono text-blue-600 mt-1">
+            <FaethmCode>
               {occupation.faethm_code}
-            </p>
+            </FaethmCode>
           )}
           {occupation.description && (
-            <p className="text-gray-600 mt-2 max-w-2xl">{occupation.description}</p>
+            <Description>{occupation.description}</Description>
           )}
-        </div>
-        <button
-          onClick={() => setShowCurationModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
+        </HeaderContent>
+        <Button onClick={() => setShowCurationModal(true)}>
           Curate Tasks
-        </button>
-      </div>
+        </Button>
+      </Header>
 
       {/* Portfolio Balance Card */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Balance</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-3xl font-bold text-blue-600">
+      <Card>
+        <CardTitle>Portfolio Balance</CardTitle>
+        <PortfolioGrid>
+          <PortfolioItem $variant="run">
+            <PortfolioValue $variant="run">
               {(occupation.ideal_run_percentage * 100).toFixed(0)}%
-            </p>
-            <p className="text-sm text-blue-800 mt-1">Run (BAU)</p>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <p className="text-3xl font-bold text-green-600">
+            </PortfolioValue>
+            <PortfolioLabel $variant="run">Run (BAU)</PortfolioLabel>
+          </PortfolioItem>
+          <PortfolioItem $variant="change">
+            <PortfolioValue $variant="change">
               {(occupation.ideal_change_percentage * 100).toFixed(0)}%
-            </p>
-            <p className="text-sm text-green-800 mt-1">Change (Projects)</p>
-          </div>
-        </div>
-      </div>
+            </PortfolioValue>
+            <PortfolioLabel $variant="change">Change (Projects)</PortfolioLabel>
+          </PortfolioItem>
+        </PortfolioGrid>
+      </Card>
 
       {/* Tasks Summary */}
-      <div className="card">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Assigned Tasks</h2>
+      <Card>
+        <CardHeaderRow>
+          <CardTitle style={{ marginBottom: 0 }}>Assigned Tasks</CardTitle>
           {summary && (
-            <div className="flex gap-2 text-sm">
-              <span className="px-2 py-1 bg-gray-100 rounded">
+            <TaskBadgesRow>
+              <TaskCountBadge>
                 {summary.total_tasks} tasks
-              </span>
-              <span className={`px-2 py-1 rounded ${
-                summary.total_percentage > 100
-                  ? 'bg-red-100 text-red-700'
-                  : summary.total_percentage === 100
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-yellow-100 text-yellow-700'
-              }`}>
+              </TaskCountBadge>
+              <AllocationBadge
+                $status={
+                  summary.total_percentage > 100
+                    ? 'over'
+                    : summary.total_percentage === 100
+                    ? 'exact'
+                    : 'under'
+                }
+              >
                 {summary.total_percentage.toFixed(0)}% allocated
-              </span>
-            </div>
+              </AllocationBadge>
+            </TaskBadgesRow>
           )}
-        </div>
+        </CardHeaderRow>
 
         {loadingTasks ? (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          </div>
+          <SpinnerWrapper>
+            <Spinner />
+          </SpinnerWrapper>
         ) : tasks && tasks.length > 0 ? (
-          <div className="space-y-2">
+          <TasksList>
             {tasks.map((assignment: OccupationTask) => (
-              <div
-                key={assignment.id}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 text-xs rounded ${
-                    CATEGORY_COLORS[assignment.category_override || assignment.global_task.category]
-                  }`}>
+              <TaskItem key={assignment.id}>
+                <TaskItemLeft>
+                  <CategoryBadge
+                    $category={assignment.category_override || assignment.global_task.category}
+                  >
                     {CATEGORY_LABELS[assignment.category_override || assignment.global_task.category]}
-                  </span>
-                  <span className="font-medium text-gray-900">
+                  </CategoryBadge>
+                  <TaskName>
                     {assignment.global_task.name}
-                  </span>
+                  </TaskName>
                   {assignment.global_task.is_custom && (
-                    <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                    <CustomBadge>
                       Custom
-                    </span>
+                    </CustomBadge>
                   )}
-                </div>
-                <div className="text-right">
-                  <span className={`font-semibold ${
-                    assignment.time_percentage > 0 ? 'text-gray-900' : 'text-gray-400'
-                  }`}>
-                    {assignment.time_percentage.toFixed(0)}%
-                  </span>
-                </div>
-              </div>
+                </TaskItemLeft>
+                <PercentageValue $hasValue={assignment.time_percentage > 0}>
+                  {assignment.time_percentage.toFixed(0)}%
+                </PercentageValue>
+              </TaskItem>
             ))}
-          </div>
+          </TasksList>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            <p className="mb-4">No tasks assigned to this occupation</p>
-            <div className="flex justify-center gap-3">
+          <EmptyState>
+            <EmptyStateText>No tasks assigned to this occupation</EmptyStateText>
+            <EmptyStateActions>
               {occupation.faethm_code && (
-                <button
+                <Button
                   onClick={handleSyncTasks}
                   disabled={syncTasks.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300"
+                  $variant="success"
                 >
                   {syncTasks.isPending ? 'Syncing...' : 'Sync Tasks from Faethm'}
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => setShowCurationModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+              <Button onClick={() => setShowCurationModal(true)}>
                 Curate Tasks Manually
-              </button>
-            </div>
-          </div>
+              </Button>
+            </EmptyStateActions>
+          </EmptyState>
         )}
-      </div>
+      </Card>
 
       {/* Teams Using This Occupation */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Teams Using This Occupation</h2>
+      <Card>
+        <CardTitle>Teams Using This Occupation</CardTitle>
         {teamsUsingOccupation.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <TeamsGrid>
             {teamsUsingOccupation.map((team: Team) => (
-              <Link
+              <TeamLink
                 key={team.id}
                 to={`/teams/${team.id}`}
-                className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <h3 className="font-medium text-gray-900">{team.name}</h3>
-                <p className="text-sm text-gray-600">{team.function}</p>
-                <p className="text-xs text-gray-500 mt-1">{team.member_count} members</p>
-              </Link>
+                <TeamName>{team.name}</TeamName>
+                <TeamFunction>{team.function}</TeamFunction>
+                <TeamMemberCount>{team.member_count} members</TeamMemberCount>
+              </TeamLink>
             ))}
-          </div>
+          </TeamsGrid>
         ) : (
-          <p className="text-gray-500 text-center py-4">
+          <CenteredText>
             No teams are using this occupation yet
-          </p>
+          </CenteredText>
         )}
-      </div>
+      </Card>
 
       {/* Task Curation Modal */}
       <TaskCurationModal
@@ -234,6 +641,6 @@ export function OccupationDetailPage() {
         isOpen={showCurationModal}
         onClose={() => setShowCurationModal(false)}
       />
-    </div>
+    </PageWrapper>
   )
 }

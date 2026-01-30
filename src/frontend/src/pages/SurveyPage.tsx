@@ -1,12 +1,378 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import styled, { keyframes } from 'styled-components'
 import { useSurveyByToken, useSubmitSurvey, useSaveProgress } from '../api/hooks'
 import { ProgressBar } from '../components/ProgressBar'
 import { LikertScale } from '../components/LikertScale'
+import { Button, Card, Badge, TextArea, Label, Spinner, Alert } from '../design-system/components'
 import type { AnswerSubmission } from '../api/types'
 
 // Auto-save interval (5 seconds)
 const AUTO_SAVE_INTERVAL = 5000
+
+// =============================================================================
+// STYLED COMPONENTS
+// =============================================================================
+
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`
+
+const PageContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+`
+
+const Header = styled.header`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  position: sticky;
+  top: 0;
+  z-index: 10;
+`
+
+const HeaderContent = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const HeaderTopRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const SurveyTitle = styled.h1`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const SaveStatusIndicator = styled.span<{ $variant?: 'saving' | 'saved' | 'error' }>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingXS};
+
+  color: ${({ theme, $variant }) => {
+    switch ($variant) {
+      case 'saving':
+        return theme.v1.semanticColors.text.body.subtle;
+      case 'saved':
+        return theme.v1.semanticColors.text.feedback.success.vibrant;
+      case 'error':
+        return theme.v1.semanticColors.text.feedback.error.vibrant;
+      default:
+        return theme.v1.semanticColors.text.body.subtle;
+    }
+  }};
+`
+
+const TimeRemaining = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ProgressInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const ResumeNoticeContainer = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding-bottom: 0;
+`
+
+const MainContent = styled.main`
+  max-width: 672px;
+  margin: 0 auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacing3XL};
+  padding-bottom: ${({ theme }) => theme.v1.spacing.spacing3XL};
+`
+
+const QuestionCard = styled(Card)`
+  animation: ${fadeIn} 0.3s ease-out;
+`
+
+const DimensionBadge = styled(Badge)`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+  text-transform: capitalize;
+`
+
+const QuestionText = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacing3XL} 0;
+`
+
+const SliderContainer = styled.div`
+  width: 100%;
+`
+
+const SliderLabels = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const SliderInput = styled.input`
+  width: 100%;
+  height: 12px;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.dark};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  appearance: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.hover};
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.default};
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: ${({ theme }) => theme.v1.semanticColors.fill.action.brand.hover};
+    }
+  }
+`
+
+const SliderValue = styled.div`
+  text-align: center;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const SliderValueText = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleM};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.accent.primary};
+`
+
+const CommentSection = styled.div`
+  margin-top: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const CommentLabel = styled(Label)`
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const OptionalText = styled.span`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.regular};
+`
+
+const CommentTextArea = styled(TextArea)`
+  resize: none;
+`
+
+const NavigationContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacing3XL};
+  padding-top: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.divider.light};
+`
+
+const QuestionDots = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  flex-wrap: wrap;
+`
+
+const QuestionDot = styled.button<{ $isCurrent: boolean; $isAnswered: boolean }>`
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+
+  background-color: ${({ theme, $isCurrent, $isAnswered }) => {
+    if ($isCurrent) {
+      return theme.v1.semanticColors.fill.action.brand.default;
+    }
+    if ($isAnswered) {
+      return theme.v1.semanticColors.fill.feedback.success.bold;
+    }
+    return theme.v1.semanticColors.fill.neutral.dark;
+  }};
+
+  ${({ theme, $isCurrent }) =>
+    $isCurrent &&
+    `
+    box-shadow: 0 0 0 2px ${theme.v1.semanticColors.canvas.default},
+                0 0 0 4px ${theme.v1.semanticColors.fill.action.brand.default};
+  `}
+
+  &:hover {
+    background-color: ${({ theme, $isCurrent, $isAnswered }) => {
+      if ($isCurrent) {
+        return theme.v1.semanticColors.fill.action.brand.default;
+      }
+      if ($isAnswered) {
+        return theme.v1.semanticColors.fill.feedback.success.bold;
+      }
+      return theme.v1.semanticColors.border.neutral.dark;
+    }};
+  }
+`
+
+const Footer = styled.footer`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} 0;
+`
+
+const FooterContent = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+  padding: 0 ${({ theme }) => theme.v1.spacing.spacingLG};
+  text-align: center;
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const LoadingContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const LoadingContent = styled.div`
+  text-align: center;
+`
+
+const LoadingSpinner = styled(Spinner)`
+  margin: 0 auto ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const LoadingText = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0;
+`
+
+const ErrorContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ErrorContent = styled.div`
+  text-align: center;
+  max-width: 448px;
+`
+
+const IconCircle = styled.div<{ $variant: 'success' | 'error' }>`
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto ${({ theme }) => theme.v1.spacing.spacingLG};
+
+  background-color: ${({ theme, $variant }) =>
+    $variant === 'success'
+      ? theme.v1.semanticColors.fill.feedback.success.subtle
+      : theme.v1.semanticColors.fill.feedback.error.subtle};
+`
+
+const CheckIcon = styled.svg`
+  width: 32px;
+  height: 32px;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.feedback.success.vibrant};
+`
+
+const WarningIcon = styled.svg`
+  width: 32px;
+  height: 32px;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.feedback.error.vibrant};
+`
+
+const ErrorTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM} 0;
+`
+
+const ErrorMessage = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0;
+`
+
+const SmallSpinner = styled.svg`
+  width: 12px;
+  height: 12px;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`
+
+const SmallCheckIcon = styled.svg`
+  width: 12px;
+  height: 12px;
+`
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
 
 export function SurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -197,12 +563,12 @@ export function SurveyPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-pearson-blue border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-pearson-gray-600">Loading survey...</p>
-        </div>
-      </div>
+      <LoadingContainer>
+        <LoadingContent>
+          <LoadingSpinner $size="lg" />
+          <LoadingText>Loading survey...</LoadingText>
+        </LoadingContent>
+      </LoadingContainer>
     )
   }
 
@@ -213,36 +579,36 @@ export function SurveyPage() {
 
     if (isAlreadySubmitted) {
       return (
-        <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center p-4">
-          <div className="text-center max-w-md">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <ErrorContainer>
+          <ErrorContent>
+            <IconCircle $variant="success">
+              <CheckIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-pearson-gray-900 mb-2">Survey Already Completed</h2>
-            <p className="text-pearson-gray-600">
+              </CheckIcon>
+            </IconCircle>
+            <ErrorTitle>Survey Already Completed</ErrorTitle>
+            <ErrorMessage>
               You have already submitted your response for this survey. Thank you for your participation!
-            </p>
-          </div>
-        </div>
+            </ErrorMessage>
+          </ErrorContent>
+        </ErrorContainer>
       )
     }
 
     return (
-      <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <ErrorContainer>
+        <ErrorContent>
+          <IconCircle $variant="error">
+            <WarningIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-pearson-gray-900 mb-2">Survey Not Found</h2>
-          <p className="text-pearson-gray-600">
+            </WarningIcon>
+          </IconCircle>
+          <ErrorTitle>Survey Not Found</ErrorTitle>
+          <ErrorMessage>
             This survey link may be invalid or expired. Please contact your team administrator for a new link.
-          </p>
-        </div>
-      </div>
+          </ErrorMessage>
+        </ErrorContent>
+      </ErrorContainer>
     )
   }
 
@@ -255,73 +621,67 @@ export function SurveyPage() {
   const answeredCount = answers.size
 
   return (
-    <div className="min-h-screen bg-pearson-gray-50">
+    <PageContainer>
       {/* Header */}
-      <header className="bg-white border-b border-pearson-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-pearson-gray-900">{data.survey_name}</h1>
-            <div className="flex items-center gap-3">
+      <Header>
+        <HeaderContent>
+          <HeaderTopRow>
+            <SurveyTitle>{data.survey_name}</SurveyTitle>
+            <HeaderActions>
               {/* Save status indicator */}
               {saveStatus === 'saving' && (
-                <span className="text-xs text-pearson-gray-500 flex items-center gap-1">
-                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <SaveStatusIndicator $variant="saving">
+                  <SmallSpinner fill="none" viewBox="0 0 24 24">
+                    <circle opacity={0.25} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path opacity={0.75} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </SmallSpinner>
                   Saving...
-                </span>
+                </SaveStatusIndicator>
               )}
               {saveStatus === 'saved' && (
-                <span className="text-xs text-green-600 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <SaveStatusIndicator $variant="saved">
+                  <SmallCheckIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  </SmallCheckIcon>
                   Saved
-                </span>
+                </SaveStatusIndicator>
               )}
               {saveStatus === 'error' && (
-                <span className="text-xs text-red-600">Save failed</span>
+                <SaveStatusIndicator $variant="error">Save failed</SaveStatusIndicator>
               )}
-              <span className="text-sm text-pearson-gray-500">
-                ~{estimatedTimeRemaining} min remaining
-              </span>
-            </div>
-          </div>
+              <TimeRemaining>~{estimatedTimeRemaining} min remaining</TimeRemaining>
+            </HeaderActions>
+          </HeaderTopRow>
           <ProgressBar current={progress} total={totalQuestions} />
-          <div className="flex justify-between text-xs text-pearson-gray-500 mt-1">
+          <ProgressInfo>
             <span>{answeredCount} of {totalQuestions} answered</span>
             {lastSaved && (
               <span>Last saved: {lastSaved.toLocaleTimeString()}</span>
             )}
-          </div>
-        </div>
-      </header>
+          </ProgressInfo>
+        </HeaderContent>
+      </Header>
 
       {/* Resume notice */}
       {initializedRef.current && answeredCount > 0 && currentQuestionIndex > 0 && (
-        <div className="max-w-2xl mx-auto px-4 pt-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        <ResumeNoticeContainer>
+          <Alert $variant="info">
             <strong>Welcome back!</strong> Your previous progress has been restored. You can continue from where you left off.
-          </div>
-        </div>
+          </Alert>
+        </ResumeNoticeContainer>
       )}
 
       {/* Question */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <MainContent>
         {currentQuestion && (
-          <div className="card animate-fade-in">
+          <QuestionCard $variant="default" $padding="lg">
             {/* Dimension badge */}
-            <div className="mb-4">
-              <span className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-pearson-gray-100 text-pearson-gray-600 capitalize">
-                {currentQuestion.dimension.replace('_', ' ')}
-              </span>
-            </div>
+            <DimensionBadge $variant="default" $size="sm">
+              {currentQuestion.dimension.replace('_', ' ')}
+            </DimensionBadge>
 
             {/* Question text */}
-            <h2 className="text-xl font-medium text-pearson-gray-900 mb-8">
-              {currentQuestion.text}
-            </h2>
+            <QuestionText>{currentQuestion.text}</QuestionText>
 
             {/* Answer options */}
             {(currentQuestion.type === 'likert_5' || currentQuestion.type === 'likert_7') && (
@@ -335,111 +695,99 @@ export function SurveyPage() {
 
             {/* Percentage slider */}
             {currentQuestion.type === 'percentage_slider' && (
-              <div className="w-full">
-                <div className="flex justify-between text-sm text-pearson-gray-600 mb-2">
+              <SliderContainer>
+                <SliderLabels>
                   <span>{currentQuestion.options?.low_label || '0%'}</span>
                   <span>{currentQuestion.options?.high_label || '100%'}</span>
-                </div>
-                <input
+                </SliderLabels>
+                <SliderInput
                   type="range"
                   min="0"
                   max="100"
                   value={currentAnswer?.numeric_value ?? 50}
                   onChange={(e) => handleAnswer(parseInt(e.target.value, 10))}
-                  className="w-full h-3 bg-pearson-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb"
                 />
-                <div className="text-center mt-3">
-                  <span className="text-2xl font-semibold text-pearson-blue">
-                    {currentAnswer?.numeric_value ?? 50}%
-                  </span>
-                </div>
-              </div>
+                <SliderValue>
+                  <SliderValueText>{currentAnswer?.numeric_value ?? 50}%</SliderValueText>
+                </SliderValue>
+              </SliderContainer>
             )}
 
             {/* Optional comment field */}
             {currentAnswer && (
-              <div className="mt-6">
-                <label
-                  htmlFor="comment"
-                  className="block text-sm font-medium text-pearson-gray-700 mb-2"
-                >
-                  Add a comment{' '}
-                  <span className="text-pearson-gray-400 font-normal">(optional)</span>
-                </label>
-                <textarea
+              <CommentSection>
+                <CommentLabel htmlFor="comment">
+                  Add a comment <OptionalText>(optional)</OptionalText>
+                </CommentLabel>
+                <CommentTextArea
                   id="comment"
                   rows={2}
                   value={currentAnswer.comment || ''}
                   onChange={(e) => handleCommentChange(e.target.value)}
                   placeholder="Share any additional context or thoughts..."
-                  className="w-full px-3 py-2 border border-pearson-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pearson-blue focus:border-transparent resize-none"
+                  $fullWidth
                 />
-              </div>
+              </CommentSection>
             )}
 
             {/* Navigation */}
-            <div className="flex justify-between mt-8 pt-6 border-t border-pearson-gray-100">
-              <button
+            <NavigationContainer>
+              <Button
+                $variant="secondary"
                 onClick={handlePrevious}
                 disabled={currentQuestionIndex === 0}
-                className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
-              </button>
+              </Button>
 
               {currentQuestionIndex < totalQuestions - 1 ? (
-                <button
+                <Button
+                  $variant="primary"
                   onClick={handleNext}
                   disabled={!canProceed}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
+                  $variant="primary"
                   onClick={handleSubmit}
                   disabled={!canProceed || submitSurvey.isPending}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitSurvey.isPending ? 'Submitting...' : 'Submit Survey'}
-                </button>
+                </Button>
               )}
-            </div>
-          </div>
+            </NavigationContainer>
+          </QuestionCard>
         )}
 
         {/* Question navigation dots */}
-        <div className="flex justify-center mt-6 gap-2 flex-wrap">
+        <QuestionDots>
           {sortedQuestions.map((q, index) => {
             const isAnswered = answers.has(q.id)
             const isCurrent = index === currentQuestionIndex
 
             return (
-              <button
+              <QuestionDot
                 key={q.id}
                 onClick={() => setCurrentQuestionIndex(index)}
-                className={`w-4 h-4 rounded-full transition-all touch-manipulation ${
-                  isCurrent
-                    ? 'bg-pearson-blue ring-2 ring-pearson-blue ring-offset-2'
-                    : isAnswered
-                    ? 'bg-pearson-green'
-                    : 'bg-pearson-gray-300 hover:bg-pearson-gray-400'
-                }`}
+                $isCurrent={isCurrent}
+                $isAnswered={isAnswered}
                 title={`Question ${index + 1}${isAnswered ? ' (answered)' : ''}`}
                 aria-label={`Go to question ${index + 1}${isAnswered ? ' (answered)' : ''}`}
               />
             )
           })}
-        </div>
-      </main>
+        </QuestionDots>
+      </MainContent>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-pearson-gray-200 py-3">
-        <div className="max-w-2xl mx-auto px-4 text-center text-xs text-pearson-gray-500">
+      <Footer>
+        <FooterContent>
           Your responses are anonymous and will be aggregated with at least 6 others before being visible.
-          {hasUnsavedChanges && ' • Progress auto-saves every few seconds.'}
-        </div>
-      </footer>
-    </div>
+          {hasUnsavedChanges && ' - Progress auto-saves every few seconds.'}
+        </FooterContent>
+      </Footer>
+    </PageContainer>
   )
 }

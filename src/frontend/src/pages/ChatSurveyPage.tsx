@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import styled, { keyframes } from 'styled-components'
 import {
   useChatSession,
   useSendChatMessage,
@@ -11,6 +12,7 @@ import type {
   ChatExtractedRating,
   FrictionType,
 } from '../api/types'
+import { Card, Button, Spinner } from '../design-system'
 
 // Dimension labels for display
 const DIMENSION_LABELS: Record<FrictionType, string> = {
@@ -31,6 +33,472 @@ const DIMENSION_ORDER: FrictionType[] = [
   'delay',
   'safety',
 ]
+
+// =============================================================================
+// STYLED COMPONENTS
+// =============================================================================
+
+const PageContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  display: flex;
+  flex-direction: column;
+`
+
+const Header = styled.header`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-bottom: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  position: sticky;
+  top: 0;
+  z-index: 10;
+`
+
+const HeaderContent = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const HeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const HeaderTitle = styled.h1`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0;
+`
+
+const HeaderStatus = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ProgressContainer = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  justify-content: center;
+`
+
+interface ProgressDotProps {
+  $isCovered: boolean
+  $isCurrent: boolean
+}
+
+const ProgressDot = styled.div<ProgressDotProps>`
+  width: 32px;
+  height: 8px;
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  transition: background-color 0.2s ease;
+  background-color: ${({ theme, $isCovered, $isCurrent }) =>
+    $isCovered
+      ? theme.v1.semanticColors.fill.feedback.success.bold
+      : $isCurrent
+      ? theme.v1.semanticColors.fill.action.brand.default
+      : theme.v1.semanticColors.fill.neutral.dark};
+`
+
+const MainContent = styled.main`
+  flex: 1;
+  overflow-y: auto;
+  padding: ${({ theme }) => theme.v1.spacing.spacing2XL} ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const MessagesContainer = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const Footer = styled.footer`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-top: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const FooterContent = styled.div`
+  max-width: 672px;
+  margin: 0 auto;
+`
+
+const InputContainer = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const ChatInput = styled.input`
+  flex: 1;
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} ${({ theme }) => theme.v1.spacing.spacingLG};
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &::placeholder {
+    color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  }
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.v1.semanticColors.border.inputs.typing};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.v1.semanticColors.fill.highlight.brand.default};
+  }
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.light};
+    cursor: not-allowed;
+  }
+`
+
+const SendButton = styled(Button)`
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const FooterText = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+  text-align: center;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+// Loading and Error states
+const CenteredContainer = styled.div`
+  min-height: 100vh;
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.highlight.light};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const LoadingContent = styled.div`
+  text-align: center;
+`
+
+const LoadingText = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ErrorContent = styled.div`
+  text-align: center;
+  max-width: 448px;
+`
+
+const ErrorIconContainer = styled.div`
+  width: 64px;
+  height: 64px;
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.feedback.error.subtle};
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const ErrorIcon = styled.svg`
+  width: 32px;
+  height: 32px;
+  color: ${({ theme }) => theme.v1.semanticColors.icon.feedback.error.vibrant};
+`
+
+const ErrorTitle = styled.h2`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const ErrorDescription = styled.p`
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0;
+`
+
+// Message Bubble Components
+interface MessageContainerProps {
+  $isUser: boolean
+}
+
+const MessageContainer = styled.div<MessageContainerProps>`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+  flex-direction: ${({ $isUser }) => ($isUser ? 'row-reverse' : 'row')};
+`
+
+interface AvatarProps {
+  $isUser: boolean
+}
+
+const Avatar = styled.div<AvatarProps>`
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.v1.semanticColors.text.inverse};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  flex-shrink: 0;
+  background-color: ${({ theme, $isUser }) =>
+    $isUser
+      ? theme.v1.semanticColors.fill.feedback.success.bold
+      : theme.v1.semanticColors.fill.action.brand.default};
+`
+
+interface MessageBubbleContainerProps {
+  $isUser: boolean
+}
+
+const MessageBubbleContainer = styled.div<MessageBubbleContainerProps>`
+  max-width: 75%;
+  border-radius: ${({ theme }) => theme.v1.radius.radius2XL};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} ${({ theme }) => theme.v1.spacing.spacingLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.xs};
+
+  ${({ theme, $isUser }) =>
+    $isUser
+      ? `
+        background-color: ${theme.v1.semanticColors.fill.action.brand.default};
+        color: ${theme.v1.semanticColors.text.inverse};
+        border-top-right-radius: ${theme.v1.radius.radiusMD};
+      `
+      : `
+        background-color: ${theme.v1.semanticColors.canvas.default};
+        border-top-left-radius: ${theme.v1.radius.radiusMD};
+      `}
+`
+
+interface MessageTextProps {
+  $isUser: boolean
+}
+
+const MessageText = styled.p<MessageTextProps>`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  line-height: 1.6;
+  margin: 0;
+  color: ${({ theme, $isUser }) =>
+    $isUser ? theme.v1.semanticColors.text.inverse : theme.v1.semanticColors.text.body.bold};
+`
+
+const DimensionBadge = styled.span`
+  display: inline-block;
+  margin-top: ${({ theme }) => theme.v1.spacing.spacingSM};
+  padding: ${({ theme }) => theme.v1.spacing.spacingXXS} ${({ theme }) => theme.v1.spacing.spacingSM};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  background-color: ${({ theme }) => theme.v1.semanticColors.fill.neutral.light};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusPill};
+`
+
+// Typing Indicator
+const bounce = keyframes`
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+`
+
+const TypingContainer = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const TypingBubble = styled.div`
+  background-color: ${({ theme }) => theme.v1.semanticColors.canvas.default};
+  border-radius: ${({ theme }) => theme.v1.radius.radius2XL};
+  border-top-left-radius: ${({ theme }) => theme.v1.radius.radiusMD};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD} ${({ theme }) => theme.v1.spacing.spacingLG};
+  box-shadow: ${({ theme }) => theme.v1.shadows.xs};
+`
+
+const TypingDots = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+interface TypingDotProps {
+  $delay: number
+}
+
+const TypingDot = styled.span<TypingDotProps>`
+  width: 8px;
+  height: 8px;
+  background-color: ${({ theme }) => theme.v1.semanticColors.border.neutral.dark};
+  border-radius: 50%;
+  animation: ${bounce} 1.2s ease-in-out infinite;
+  animation-delay: ${({ $delay }) => $delay}ms;
+`
+
+// Rating Confirmation Card
+const RatingCard = styled(Card)`
+  border: 1px solid ${({ theme }) => theme.v1.semanticColors.border.neutral.default};
+`
+
+const RatingTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  color: ${({ theme }) => theme.v1.semanticColors.text.heading.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingSM};
+`
+
+const RatingReasoning = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.default};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const RatingPrompt = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.bold};
+  margin: 0 0 ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const RatingPromptScore = styled.span`
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+`
+
+const RatingButtonsContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.v1.spacing.spacingSM};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+interface RatingButtonProps {
+  $isSelected: boolean
+}
+
+const RatingButton = styled.button<RatingButtonProps>`
+  flex: 1;
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  ${({ theme, $isSelected }) =>
+    $isSelected
+      ? `
+        background-color: ${theme.v1.semanticColors.fill.action.brand.default};
+        color: ${theme.v1.semanticColors.text.inverse};
+      `
+      : `
+        background-color: ${theme.v1.semanticColors.fill.neutral.light};
+        color: ${theme.v1.semanticColors.text.body.bold};
+
+        &:hover {
+          background-color: ${theme.v1.semanticColors.fill.neutral.dark};
+        }
+      `}
+`
+
+const ScoreLabelsContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacing2XL};
+`
+
+const ScoreLabel = styled.span`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  color: ${({ theme }) => theme.v1.semanticColors.text.body.subtle};
+`
+
+const ActionButtonsContainer = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const ConfirmButton = styled(Button)`
+  flex: 1;
+`
+
+const AdjustButton = styled(Button)`
+  flex: 1;
+`
+
+// Completion Summary
+const CompletionCard = styled.div`
+  background: linear-gradient(135deg, ${({ theme }) => theme.v1.semanticColors.fill.feedback.success.bold}, ${({ theme }) => theme.v1.colors.status.green[700]});
+  border-radius: ${({ theme }) => theme.v1.radius.radiusXL};
+  padding: ${({ theme }) => theme.v1.spacing.spacing2XL};
+  color: ${({ theme }) => theme.v1.semanticColors.text.inverse};
+`
+
+const CompletionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingLG};
+`
+
+const CompletionIconContainer = styled.div`
+  width: 40px;
+  height: 40px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const CompletionIcon = styled.svg`
+  width: 24px;
+  height: 24px;
+`
+
+const CompletionTitle = styled.h3`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.semibold};
+  margin: 0;
+`
+
+const CompletionSubtitle = styled.p`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.bodyS};
+  opacity: 0.8;
+  margin: 0;
+`
+
+const RatingsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: ${({ theme }) => theme.v1.spacing.spacingMD};
+`
+
+const RatingItem = styled.div`
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: ${({ theme }) => theme.v1.radius.radiusLG};
+  padding: ${({ theme }) => theme.v1.spacing.spacingMD};
+  text-align: center;
+`
+
+const RatingItemLabel = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.helper};
+  opacity: 0.7;
+  margin-bottom: ${({ theme }) => theme.v1.spacing.spacingXS};
+`
+
+const RatingItemScore = styled.div`
+  font-size: ${({ theme }) => theme.v1.typography.sizes.titleS};
+  font-weight: ${({ theme }) => theme.v1.typography.weights.bold};
+`
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 export function ChatSurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -141,31 +609,31 @@ export function ChatSurveyPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-pearson-blue border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-pearson-gray-600">Loading chat...</p>
-        </div>
-      </div>
+      <CenteredContainer>
+        <LoadingContent>
+          <Spinner $size="lg" />
+          <LoadingText>Loading chat...</LoadingText>
+        </LoadingContent>
+      </CenteredContainer>
     )
   }
 
   // Error state
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-pearson-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <CenteredContainer>
+        <ErrorContent>
+          <ErrorIconContainer>
+            <ErrorIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-pearson-gray-900 mb-2">Chat Session Not Found</h2>
-          <p className="text-pearson-gray-600">
+            </ErrorIcon>
+          </ErrorIconContainer>
+          <ErrorTitle>Chat Session Not Found</ErrorTitle>
+          <ErrorDescription>
             This chat link may be invalid or expired. Please contact your team administrator for a new link.
-          </p>
-        </div>
-      </div>
+          </ErrorDescription>
+        </ErrorContent>
+      </CenteredContainer>
     )
   }
 
@@ -178,64 +646,57 @@ export function ChatSurveyPage() {
   const totalDimensions = DIMENSION_ORDER.length
 
   return (
-    <div className="min-h-screen bg-pearson-gray-50 flex flex-col">
+    <PageContainer>
       {/* Header */}
-      <header className="bg-white border-b border-pearson-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-pearson-gray-900">
+      <Header>
+        <HeaderContent>
+          <HeaderRow>
+            <HeaderTitle>
               {isCompleted ? 'Chat Complete' : 'Work Experience Chat'}
-            </h1>
-            <span className="text-sm text-pearson-gray-500">
+            </HeaderTitle>
+            <HeaderStatus>
               {isCompleted ? 'Thank you!' : `${coveredCount}/${totalDimensions} topics`}
-            </span>
-          </div>
+            </HeaderStatus>
+          </HeaderRow>
 
           {/* Dimension progress indicator */}
-          <div className="flex gap-2 justify-center">
+          <ProgressContainer>
             {DIMENSION_ORDER.map((dim) => {
               const isCovered = session.dimensions_covered[dim]
               const isCurrent = session.current_dimension === dim
 
               return (
-                <div
+                <ProgressDot
                   key={dim}
-                  className={`w-8 h-2 rounded-full transition-all ${
-                    isCovered
-                      ? 'bg-pearson-green'
-                      : isCurrent
-                      ? 'bg-pearson-blue'
-                      : 'bg-pearson-gray-200'
-                  }`}
+                  $isCovered={isCovered}
+                  $isCurrent={isCurrent}
                   title={`${DIMENSION_LABELS[dim]}${isCovered ? ' (covered)' : ''}`}
                 />
               )
             })}
-          </div>
-        </div>
-      </header>
+          </ProgressContainer>
+        </HeaderContent>
+      </Header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
+      <MainContent>
+        <MessagesContainer>
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubbleComponent key={message.id} message={message} />
           ))}
 
           {/* Typing indicator */}
           {isTyping && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-pearson-blue flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                AI
-              </div>
-              <div className="bg-white rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-pearson-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-pearson-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-pearson-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
+            <TypingContainer>
+              <Avatar $isUser={false}>AI</Avatar>
+              <TypingBubble>
+                <TypingDots>
+                  <TypingDot $delay={0} />
+                  <TypingDot $delay={150} />
+                  <TypingDot $delay={300} />
+                </TypingDots>
+              </TypingBubble>
+            </TypingContainer>
           )}
 
           {/* Rating confirmation UI */}
@@ -254,15 +715,15 @@ export function ChatSurveyPage() {
           )}
 
           <div ref={messagesEndRef} />
-        </div>
-      </main>
+        </MessagesContainer>
+      </MainContent>
 
       {/* Input area */}
       {!isCompleted && !isRatingPhase && (
-        <footer className="bg-white border-t border-pearson-gray-200 p-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex gap-3">
-              <input
+        <Footer>
+          <FooterContent>
+            <InputContainer>
+              <ChatInput
                 ref={inputRef}
                 type="text"
                 value={inputValue}
@@ -270,65 +731,59 @@ export function ChatSurveyPage() {
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 disabled={isTyping}
-                className="flex-1 px-4 py-3 border border-pearson-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-pearson-blue focus:border-transparent disabled:bg-pearson-gray-100"
               />
-              <button
+              <SendButton
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || isTyping}
-                className="px-6 py-3 bg-pearson-blue text-white rounded-full font-medium hover:bg-pearson-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Send
-              </button>
-            </div>
-            <p className="text-xs text-pearson-gray-500 text-center mt-3">
+              </SendButton>
+            </InputContainer>
+            <FooterText>
               Your responses are anonymous and will be aggregated with others.
-            </p>
-          </div>
-        </footer>
+            </FooterText>
+          </FooterContent>
+        </Footer>
       )}
-    </div>
+    </PageContainer>
   )
 }
 
-// Message bubble component
-function MessageBubble({ message }: { message: ChatMessage }) {
+// =============================================================================
+// MESSAGE BUBBLE COMPONENT
+// =============================================================================
+
+function MessageBubbleComponent({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <MessageContainer $isUser={isUser}>
       {/* Avatar */}
-      <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ${
-          isUser ? 'bg-pearson-green' : 'bg-pearson-blue'
-        }`}
-      >
+      <Avatar $isUser={isUser}>
         {isUser ? 'You' : 'AI'}
-      </div>
+      </Avatar>
 
       {/* Message content */}
-      <div
-        className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
-          isUser
-            ? 'bg-pearson-blue text-white rounded-tr-md'
-            : 'bg-white rounded-tl-md'
-        }`}
-      >
-        <p className={`text-sm leading-relaxed ${isUser ? 'text-white' : 'text-pearson-gray-800'}`}>
+      <MessageBubbleContainer $isUser={isUser}>
+        <MessageText $isUser={isUser}>
           {message.content}
-        </p>
+        </MessageText>
 
         {/* Dimension badge */}
         {message.dimension_context && !isUser && (
-          <span className="inline-block mt-2 px-2 py-0.5 text-xs bg-pearson-gray-100 text-pearson-gray-600 rounded-full">
+          <DimensionBadge>
             {DIMENSION_LABELS[message.dimension_context]}
-          </span>
+          </DimensionBadge>
         )}
-      </div>
-    </div>
+      </MessageBubbleContainer>
+    </MessageContainer>
   )
 }
 
-// Rating confirmation card component
+// =============================================================================
+// RATING CONFIRMATION CARD COMPONENT
+// =============================================================================
+
 function RatingConfirmationCard({
   dimension,
   score,
@@ -346,107 +801,105 @@ function RatingConfirmationCard({
   const scoreLabels = ['Significant issues', 'Frequent friction', 'Moderate', 'Occasional', 'Smooth']
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 border border-pearson-gray-200">
-      <h3 className="text-lg font-semibold text-pearson-gray-900 mb-2">
+    <RatingCard $variant="elevated" $padding="lg">
+      <RatingTitle>
         Confirm: {DIMENSION_LABELS[dimension]}
-      </h3>
+      </RatingTitle>
 
       {reasoning && (
-        <p className="text-sm text-pearson-gray-600 mb-4">{reasoning}</p>
+        <RatingReasoning>{reasoning}</RatingReasoning>
       )}
 
-      <p className="text-sm text-pearson-gray-700 mb-4">
+      <RatingPrompt>
         Based on our conversation, I'd rate this around{' '}
-        <span className="font-semibold">{Math.round(score)}/5</span>.
+        <RatingPromptScore>{Math.round(score)}/5</RatingPromptScore>.
         Does that feel right?
-      </p>
+      </RatingPrompt>
 
       {/* Rating buttons */}
-      <div className="flex justify-between gap-2 mb-4">
+      <RatingButtonsContainer>
         {[1, 2, 3, 4, 5].map((num) => (
-          <button
+          <RatingButton
             key={num}
+            $isSelected={selectedScore === num}
             onClick={() => {
               setSelectedScore(num)
               if (num !== Math.round(score)) {
                 setIsAdjusting(true)
               }
             }}
-            className={`flex-1 py-3 rounded-lg font-medium text-sm transition-all ${
-              selectedScore === num
-                ? 'bg-pearson-blue text-white'
-                : 'bg-pearson-gray-100 text-pearson-gray-700 hover:bg-pearson-gray-200'
-            }`}
           >
             {num}
-          </button>
+          </RatingButton>
         ))}
-      </div>
+      </RatingButtonsContainer>
 
       {/* Score labels */}
-      <div className="flex justify-between text-xs text-pearson-gray-500 mb-6">
-        <span>{scoreLabels[0]}</span>
-        <span>{scoreLabels[4]}</span>
-      </div>
+      <ScoreLabelsContainer>
+        <ScoreLabel>{scoreLabels[0]}</ScoreLabel>
+        <ScoreLabel>{scoreLabels[4]}</ScoreLabel>
+      </ScoreLabelsContainer>
 
       {/* Action buttons */}
-      <div className="flex gap-3">
+      <ActionButtonsContainer>
         {isAdjusting || selectedScore !== Math.round(score) ? (
-          <button
+          <ConfirmButton
+            $fullWidth
             onClick={() => onConfirm(false, selectedScore)}
-            className="flex-1 py-3 bg-pearson-blue text-white rounded-lg font-medium hover:bg-pearson-blue-dark transition-colors"
           >
             Confirm as {selectedScore}/5
-          </button>
+          </ConfirmButton>
         ) : (
           <>
-            <button
+            <ConfirmButton
               onClick={() => onConfirm(true)}
-              className="flex-1 py-3 bg-pearson-green text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               Yes, that's right
-            </button>
-            <button
+            </ConfirmButton>
+            <AdjustButton
+              $variant="secondary"
               onClick={() => setIsAdjusting(true)}
-              className="flex-1 py-3 bg-pearson-gray-200 text-pearson-gray-700 rounded-lg font-medium hover:bg-pearson-gray-300 transition-colors"
             >
               Adjust rating
-            </button>
+            </AdjustButton>
           </>
         )}
-      </div>
-    </div>
+      </ActionButtonsContainer>
+    </RatingCard>
   )
 }
 
-// Completion summary component
+// =============================================================================
+// COMPLETION SUMMARY COMPONENT
+// =============================================================================
+
 function CompletionSummary({ ratings }: { ratings: ChatExtractedRating[] }) {
   return (
-    <div className="bg-gradient-to-br from-pearson-green to-green-600 rounded-xl p-6 text-white">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <CompletionCard>
+      <CompletionHeader>
+        <CompletionIconContainer>
+          <CompletionIcon fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
+          </CompletionIcon>
+        </CompletionIconContainer>
         <div>
-          <h3 className="text-lg font-semibold">Thank you!</h3>
-          <p className="text-sm text-white/80">Your feedback has been recorded</p>
+          <CompletionTitle>Thank you!</CompletionTitle>
+          <CompletionSubtitle>Your feedback has been recorded</CompletionSubtitle>
         </div>
-      </div>
+      </CompletionHeader>
 
-      <div className="grid grid-cols-3 gap-3">
+      <RatingsGrid>
         {ratings.map((rating) => (
-          <div key={rating.id} className="bg-white/10 rounded-lg p-3 text-center">
-            <div className="text-xs text-white/70 mb-1">
+          <RatingItem key={rating.id}>
+            <RatingItemLabel>
               {DIMENSION_LABELS[rating.dimension]}
-            </div>
-            <div className="text-xl font-bold">
+            </RatingItemLabel>
+            <RatingItemScore>
               {Math.round(rating.final_score / 20)}/5
-            </div>
-          </div>
+            </RatingItemScore>
+          </RatingItem>
         ))}
-      </div>
-    </div>
+      </RatingsGrid>
+    </CompletionCard>
   )
 }
