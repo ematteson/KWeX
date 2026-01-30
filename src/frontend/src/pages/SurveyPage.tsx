@@ -136,10 +136,28 @@ export function SurveyPage() {
   const handleAnswer = (value: number) => {
     if (!currentQuestion) return
 
+    const existing = answers.get(currentQuestion.id)
     const answerSubmission: AnswerSubmission = {
       question_id: currentQuestion.id,
       value: String(value),
       numeric_value: value,
+      comment: existing?.comment || null,
+    }
+
+    setAnswers((prev) => new Map(prev).set(currentQuestion.id, answerSubmission))
+    setHasUnsavedChanges(true)
+  }
+
+  // Handle comment change
+  const handleCommentChange = (comment: string) => {
+    if (!currentQuestion) return
+
+    const existing = answers.get(currentQuestion.id)
+    if (!existing) return // Need an answer first
+
+    const answerSubmission: AnswerSubmission = {
+      ...existing,
+      comment: comment || null,
     }
 
     setAnswers((prev) => new Map(prev).set(currentQuestion.id, answerSubmission))
@@ -335,6 +353,27 @@ export function SurveyPage() {
                     {currentAnswer?.numeric_value ?? 50}%
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Optional comment field */}
+            {currentAnswer && (
+              <div className="mt-6">
+                <label
+                  htmlFor="comment"
+                  className="block text-sm font-medium text-pearson-gray-700 mb-2"
+                >
+                  Add a comment{' '}
+                  <span className="text-pearson-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  id="comment"
+                  rows={2}
+                  value={currentAnswer.comment || ''}
+                  onChange={(e) => handleCommentChange(e.target.value)}
+                  placeholder="Share any additional context or thoughts..."
+                  className="w-full px-3 py-2 border border-pearson-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pearson-blue focus:border-transparent resize-none"
+                />
               </div>
             )}
 

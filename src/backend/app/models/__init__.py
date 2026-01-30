@@ -2,6 +2,12 @@
 
 from app.models.models import (
     Answer,
+    ChatExtractedRating,
+    ChatMessage,
+    ChatMessageRole,
+    ChatSession,
+    ChatSessionStatus,
+    ChatSummary,
     CollaborationLevel,
     ComplexityLevel,
     EnrichedTask,
@@ -49,6 +55,11 @@ __all__ = [
     "EnrichedTask",
     "LLMQuestionTemplate",
     "LLMGenerationLog",
+    # Chat Survey Models
+    "ChatSession",
+    "ChatMessage",
+    "ChatExtractedRating",
+    "ChatSummary",
     # Enums
     "TaskCategory",
     "FrictionType",
@@ -64,4 +75,7 @@ __all__ = [
     "LLMOperationType",
     "ComplexityLevel",
     "CollaborationLevel",
+    # Chat Survey Enums
+    "ChatSessionStatus",
+    "ChatMessageRole",
 ]

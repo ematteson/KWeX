@@ -2,19 +2,23 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { TeamDashboard } from './pages/TeamDashboard'
 import { SurveyPage } from './pages/SurveyPage'
+import { SurveyLandingPage } from './pages/SurveyLandingPage'
 import { SurveyComplete } from './pages/SurveyComplete'
 import { TeamsPage } from './pages/TeamsPage'
 import { OpportunitiesPage } from './pages/OpportunitiesPage'
 import { ExecutiveDashboard } from './pages/ExecutiveDashboard'
 import { OccupationDetailPage } from './pages/OccupationDetailPage'
+import { ChatSurveyPage } from './pages/ChatSurveyPage'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public survey route - no layout wrapper */}
-        <Route path="/survey/:token" element={<SurveyPage />} />
+        {/* Public survey routes - no layout wrapper */}
+        <Route path="/survey/:token" element={<SurveyLandingPage />} />
+        <Route path="/survey/:token/form" element={<SurveyPage />} />
         <Route path="/survey/complete" element={<SurveyComplete />} />
+        <Route path="/chat/:token" element={<ChatSurveyPage />} />
 
         {/* Dashboard routes with layout */}
         <Route path="/" element={<Layout />}>

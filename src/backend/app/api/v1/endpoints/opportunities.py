@@ -24,6 +24,70 @@ router = APIRouter(prefix="/teams", tags=["opportunities"])
 settings = get_settings()
 
 
+# NOTE: summary route MUST come before the general /{team_id}/opportunities route
+# to avoid "summary" being matched as an opportunity_id
+@router.get("/{team_id}/opportunities/summary")
+def get_opportunities_summary(
+    team_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get summary statistics for team opportunities.
+
+    Returns counts by status and top priorities.
+    """
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Get all opportunities
+    opportunities = (
+        db.query(Opportunity).filter(Opportunity.team_id == team_id).all()
+    )
+
+    # Count by status
+    status_counts = {}
+    for status in OpportunityStatus:
+        status_counts[status.value] = sum(
+            1 for o in opportunities if o.status == status
+        )
+
+    # Get top 5 by RICE score
+    top_opportunities = sorted(
+        [o for o in opportunities if o.status == OpportunityStatus.IDENTIFIED],
+        key=lambda x: x.rice_score,
+        reverse=True,
+    )[:5]
+
+    # Calculate average RICE score
+    active_opportunities = [
+        o
+        for o in opportunities
+        if o.status in (OpportunityStatus.IDENTIFIED, OpportunityStatus.IN_PROGRESS)
+    ]
+    avg_rice = (
+        sum(o.rice_score for o in active_opportunities) / len(active_opportunities)
+        if active_opportunities
+        else 0
+    )
+
+    return {
+        "team_id": team_id,
+        "total_opportunities": len(opportunities),
+        "status_counts": status_counts,
+        "average_rice_score": round(avg_rice, 2),
+        "top_priorities": [
+            {
+                "id": o.id,
+                "title": o.title,
+                "rice_score": round(o.rice_score, 2),
+                "friction_type": o.friction_type.value if o.friction_type else None,
+            }
+            for o in top_opportunities
+        ],
+    }
+
+
 @router.get("/{team_id}/opportunities", response_model=list[OpportunityResponse])
 def get_team_opportunities(
     team_id: str,
@@ -266,67 +330,5 @@ def generate_opportunities(
                 "rice_score": opp.rice_score,
             }
             for opp in opportunities
-        ],
-    }
-
-
-@router.get("/{team_id}/opportunities/summary")
-def get_opportunities_summary(
-    team_id: str,
-    db: Session = Depends(get_db),
-):
-    """
-    Get summary statistics for team opportunities.
-
-    Returns counts by status and top priorities.
-    """
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
-    # Get all opportunities
-    opportunities = (
-        db.query(Opportunity).filter(Opportunity.team_id == team_id).all()
-    )
-
-    # Count by status
-    status_counts = {}
-    for status in OpportunityStatus:
-        status_counts[status.value] = sum(
-            1 for o in opportunities if o.status == status
-        )
-
-    # Get top 5 by RICE score
-    top_opportunities = sorted(
-        [o for o in opportunities if o.status == OpportunityStatus.IDENTIFIED],
-        key=lambda x: x.rice_score,
-        reverse=True,
-    )[:5]
-
-    # Calculate average RICE score
-    active_opportunities = [
-        o
-        for o in opportunities
-        if o.status in (OpportunityStatus.IDENTIFIED, OpportunityStatus.IN_PROGRESS)
-    ]
-    avg_rice = (
-        sum(o.rice_score for o in active_opportunities) / len(active_opportunities)
-        if active_opportunities
-        else 0
-    )
-
-    return {
-        "team_id": team_id,
-        "total_opportunities": len(opportunities),
-        "status_counts": status_counts,
-        "average_rice_score": round(avg_rice, 2),
-        "top_priorities": [
-            {
-                "id": o.id,
-                "title": o.title,
-                "rice_score": round(o.rice_score, 2),
-                "friction_type": o.friction_type.value if o.friction_type else None,
-            }
-            for o in top_opportunities
         ],
     }

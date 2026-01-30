@@ -2,10 +2,12 @@
 export type FrictionType = 'clarity' | 'tooling' | 'process' | 'rework' | 'delay' | 'safety'
 export type QuestionType = 'likert_5' | 'likert_7' | 'multiple_choice' | 'percentage_slider' | 'free_text'
 export type SurveyStatus = 'draft' | 'active' | 'closed'
-export type SurveyType = 'CORE_FRICTION' | 'PSYCHOLOGICAL_SAFETY' | 'CUSTOM'
+export type SurveyType = 'core_friction' | 'psychological_safety' | 'custom' | 'chat_survey'
 export type OpportunityStatus = 'identified' | 'in_progress' | 'completed' | 'deferred'
 export type TrendDirection = 'up' | 'down' | 'stable'
 export type TaskCategory = 'core' | 'support' | 'admin'
+export type ChatSessionStatus = 'started' | 'in_progress' | 'rating_confirmation' | 'completed' | 'abandoned'
+export type ChatMessageRole = 'system' | 'assistant' | 'user'
 
 // Team
 export interface Team {
@@ -56,6 +58,7 @@ export interface AnswerSubmission {
   question_id: string
   value: string
   numeric_value: number | null
+  comment?: string | null
 }
 
 // Survey response (submission)
@@ -431,4 +434,136 @@ export interface PsychSafetyDimensions {
 export interface PsychSafetyCreateRequest {
   team_id: string
   name?: string
+}
+
+// ============================================================================
+// Chat Survey Types
+// ============================================================================
+
+export interface ChatSession {
+  id: string
+  survey_id: string
+  response_id: string
+  anonymous_token: string
+  status: ChatSessionStatus
+  current_dimension: FrictionType | null
+  dimensions_covered: Record<FrictionType, boolean>
+  llm_provider: string
+  started_at: string
+  completed_at: string | null
+  last_activity_at: string
+  total_tokens_input: number
+  total_tokens_output: number
+}
+
+export interface ChatMessage {
+  id: string
+  session_id: string
+  role: ChatMessageRole
+  content: string
+  dimension_context: FrictionType | null
+  is_rating_confirmation: boolean
+  sequence: number
+  created_at: string
+}
+
+export interface ChatExtractedRating {
+  id: string
+  session_id: string
+  dimension: FrictionType
+  ai_inferred_score: number
+  ai_confidence: number
+  ai_reasoning: string | null
+  user_confirmed: boolean
+  user_adjusted_score: number | null
+  final_score: number
+  key_quotes: string[] | null
+  summary_comment: string | null
+  created_at: string
+}
+
+export interface ChatSummary {
+  id: string
+  session_id: string
+  executive_summary: string
+  key_pain_points: { dimension: FrictionType; description: string; severity: string }[]
+  positive_aspects: string[]
+  improvement_suggestions: string[]
+  overall_sentiment: 'positive' | 'neutral' | 'negative'
+  dimension_sentiments: Record<FrictionType, string>
+  created_at: string
+}
+
+export interface ChatSessionCreate {
+  survey_id: string
+  llm_provider?: string
+}
+
+export interface ChatMessageCreate {
+  content: string
+}
+
+export interface RatingConfirmation {
+  dimension: FrictionType
+  confirmed: boolean
+  adjusted_score?: number
+}
+
+export interface ChatConversationResponse {
+  session: ChatSession
+  messages: ChatMessage[]
+  extracted_ratings: ChatExtractedRating[]
+}
+
+export interface ChatMessageSendResponse {
+  user_message: ChatMessage
+  assistant_message: ChatMessage
+  session_status: ChatSessionStatus
+  current_dimension: FrictionType | null
+  dimensions_covered: Record<FrictionType, boolean>
+  pending_rating_confirmation: {
+    dimension: FrictionType
+    score: number
+    confidence: number
+    reasoning: string | null
+  } | null
+}
+
+export interface ChatRatingConfirmResponse {
+  rating: ChatExtractedRating
+  next_dimension: FrictionType | null
+  all_confirmed: boolean
+  assistant_message: ChatMessage | null
+}
+
+export interface ChatCompleteResponse {
+  session: ChatSession
+  summary: ChatSummary
+  extracted_ratings: ChatExtractedRating[]
+  metrics_calculated: boolean
+  metric_result_id: string | null
+}
+
+export interface ChatTranscriptResponse {
+  session: ChatSession
+  messages: ChatMessage[]
+  extracted_ratings: ChatExtractedRating[]
+  summary: ChatSummary | null
+}
+
+export interface StartChatSurveyResponse {
+  session: ChatSession
+  opening_message: ChatMessage
+  chat_url: string
+}
+
+export interface ChatSessionStatus2 {
+  session_id: string
+  status: ChatSessionStatus
+  current_dimension: FrictionType | null
+  dimensions_covered: Record<FrictionType, boolean>
+  message_count: number
+  ratings_count: number
+  unconfirmed_ratings: number
+  total_tokens: number
 }

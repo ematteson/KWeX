@@ -32,6 +32,16 @@ import type {
   PsychSafetyResult,
   PsychSafetyDimensions,
   PsychSafetyCreateRequest,
+  // Chat Survey Types
+  ChatConversationResponse,
+  ChatMessageSendResponse,
+  ChatRatingConfirmResponse,
+  ChatCompleteResponse,
+  ChatTranscriptResponse,
+  StartChatSurveyResponse,
+  ChatSessionCreate,
+  ChatMessageCreate,
+  RatingConfirmation,
 } from './types'
 
 // Teams
@@ -904,10 +914,152 @@ export function useTeamPsychSafetySurveys(teamId: string) {
     queryKey: ['surveys', 'team', teamId, 'psych-safety'],
     queryFn: async () => {
       const { data } = await apiClient.get<Survey[]>('/surveys', {
-        params: { team_id: teamId, survey_type: 'PSYCHOLOGICAL_SAFETY' }
+        params: { team_id: teamId, survey_type: 'psychological_safety' }
       })
       return data
     },
     enabled: !!teamId,
+  })
+}
+
+// ============================================================================
+// Chat Survey Hooks
+// ============================================================================
+
+/**
+ * Start a new chat survey session
+ */
+export function useStartChatSurvey() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: ChatSessionCreate) => {
+      const { data } = await apiClient.post<StartChatSurveyResponse>('/chat-surveys', request)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] })
+    },
+  })
+}
+
+/**
+ * Get a chat session with all messages by token
+ */
+export function useChatSession(token: string) {
+  return useQuery({
+    queryKey: ['chat-sessions', token],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ChatConversationResponse>(`/chat-surveys/${token}`)
+      return data
+    },
+    enabled: !!token,
+  })
+}
+
+/**
+ * Send a message in a chat session
+ */
+export function useSendChatMessage(token: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (message: ChatMessageCreate) => {
+      const { data } = await apiClient.post<ChatMessageSendResponse>(
+        `/chat-surveys/${token}/message`,
+        message
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions', token] })
+    },
+  })
+}
+
+/**
+ * Confirm or adjust an AI-inferred rating
+ */
+export function useConfirmRating(token: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (confirmation: RatingConfirmation) => {
+      const { data } = await apiClient.post<ChatRatingConfirmResponse>(
+        `/chat-surveys/${token}/confirm-rating`,
+        confirmation
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions', token] })
+    },
+  })
+}
+
+/**
+ * Complete a chat session and generate metrics
+ */
+export function useCompleteChat(token: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<ChatCompleteResponse>(
+        `/chat-surveys/${token}/complete`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions', token] })
+      queryClient.invalidateQueries({ queryKey: ['metrics'] })
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+    },
+  })
+}
+
+/**
+ * Get the full transcript of a chat session
+ */
+export function useChatTranscript(token: string) {
+  return useQuery({
+    queryKey: ['chat-sessions', token, 'transcript'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ChatTranscriptResponse>(
+        `/chat-surveys/${token}/transcript`
+      )
+      return data
+    },
+    enabled: !!token,
+  })
+}
+
+/**
+ * Abandon a chat session
+ */
+export function useAbandonChat(token: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<{ message: string; session_id: string }>(
+        `/chat-surveys/${token}/abandon`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions', token] })
+    },
+  })
+}
+
+/**
+ * Get chat session status (lightweight polling)
+ */
+export function useChatSessionStatus(token: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['chat-sessions', token, 'status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/chat-surveys/${token}/status`)
+      return data
+    },
+    enabled: enabled && !!token,
+    refetchInterval: 5000, // Poll every 5 seconds when active
   })
 }

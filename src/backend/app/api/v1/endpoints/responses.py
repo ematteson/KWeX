@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models import Response, Survey, Question, Answer, SurveyStatus
 from app.schemas import ResponseSubmit
-from app.schemas.schemas import SurveyResponseResponse, QuestionResponse
+from app.schemas.schemas import (
+    ChatMessageResponse,
+    ChatSessionResponse,
+    QuestionResponse,
+    SurveyResponseResponse,
+)
+from app.services.chat_survey_service import ChatSurveyService
 
 router = APIRouter(prefix="/respond", tags=["responses"])
 
@@ -154,6 +160,82 @@ def save_partial_response(token: str, submission: ResponseSubmit, db: Session = 
     db.commit()
 
     return {"message": "Progress saved", "answers_saved": len(submission.answers)}
+
+
+@router.post("/{token}/start-chat")
+async def start_chat_from_response(token: str, db: Session = Depends(get_db)):
+    """Start a chat survey session from an existing response token.
+
+    This allows users who received a traditional survey link to switch
+    to the conversational chat mode instead.
+    """
+    response = db.query(Response).filter(Response.anonymous_token == token).first()
+    if not response:
+        raise HTTPException(status_code=404, detail="Invalid response token")
+
+    survey = db.query(Survey).filter(Survey.id == response.survey_id).first()
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found")
+
+    if survey.status != SurveyStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Survey is not accepting responses")
+
+    if response.is_complete:
+        raise HTTPException(status_code=400, detail="Response already submitted")
+
+    # Check if there are existing answers (user started traditional survey)
+    existing_answers = db.query(Answer).filter(Answer.response_id == response.id).count()
+    if existing_answers > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="You have already started the traditional survey. Please complete it or contact support to reset."
+        )
+
+    # Check if a chat session already exists for this response
+    from app.models import ChatSession
+    existing_chat = db.query(ChatSession).filter(
+        ChatSession.response_id == response.id
+    ).first()
+
+    if existing_chat:
+        # Return existing chat session
+        return {
+            "session": ChatSessionResponse.model_validate(existing_chat),
+            "opening_message": ChatMessageResponse.model_validate(existing_chat.messages[0]) if existing_chat.messages else None,
+            "chat_url": f"/chat/{existing_chat.anonymous_token}",
+        }
+
+    # Create new chat session linked to this response
+    service = ChatSurveyService(db)
+
+    try:
+        # We need to create the chat session but link it to the existing response
+        # Instead of creating a new response, modify the service call
+        session, opening_message = await service.start_session(
+            survey_id=survey.id,
+            llm_provider="claude",
+        )
+
+        # Update the chat session to use the existing response
+        # (The service created a new response, so we need to clean that up)
+        new_response_id = session.response_id
+        session.response_id = response.id
+
+        # Delete the auto-created response
+        auto_response = db.query(Response).filter(Response.id == new_response_id).first()
+        if auto_response and auto_response.id != response.id:
+            db.delete(auto_response)
+
+        db.commit()
+
+        return {
+            "session": ChatSessionResponse.model_validate(session),
+            "opening_message": ChatMessageResponse.model_validate(opening_message),
+            "chat_url": f"/chat/{session.anonymous_token}",
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 def _normalize_answer(value: str, question_type) -> float | None:

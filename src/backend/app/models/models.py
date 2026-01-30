@@ -49,6 +49,23 @@ class SurveyType(str, enum.Enum):
     CORE_FRICTION = "core_friction"  # Standard KWeX Core 4 metrics survey
     PSYCHOLOGICAL_SAFETY = "psychological_safety"  # Edmondson's 7-item scale
     CUSTOM = "custom"  # User-defined questions
+    CHAT_SURVEY = "chat_survey"  # AI-powered conversational survey
+
+
+class ChatSessionStatus(str, enum.Enum):
+    """Status of a chat survey session."""
+    STARTED = "started"
+    IN_PROGRESS = "in_progress"
+    RATING_CONFIRMATION = "rating_confirmation"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class ChatMessageRole(str, enum.Enum):
+    """Role of a message in the chat conversation."""
+    SYSTEM = "system"
+    ASSISTANT = "assistant"
+    USER = "user"
 
 
 class QuestionType(str, enum.Enum):
@@ -336,6 +353,7 @@ class Answer(Base):
     question_id: Mapped[str] = mapped_column(String(36), ForeignKey("questions.id"))
     value: Mapped[str] = mapped_column(Text, nullable=False)
     numeric_value: Mapped[Optional[float]] = mapped_column(Float)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Free text comment
 
     # Relationships
     response: Mapped["Response"] = relationship(back_populates="answers")
@@ -504,3 +522,119 @@ class LLMGenerationLog(Base):
         String(36), ForeignKey("surveys.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ChatSession(Base):
+    """Chat survey session tracking."""
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    survey_id: Mapped[str] = mapped_column(String(36), ForeignKey("surveys.id"))
+    response_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("responses.id"), unique=True
+    )
+    anonymous_token: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False, default=generate_uuid
+    )
+    status: Mapped[ChatSessionStatus] = mapped_column(
+        Enum(ChatSessionStatus), default=ChatSessionStatus.STARTED
+    )
+    current_dimension: Mapped[Optional[FrictionType]] = mapped_column(
+        Enum(FrictionType), nullable=True
+    )
+    dimensions_covered: Mapped[dict] = mapped_column(JSON, default=dict)
+    llm_provider: Mapped[str] = mapped_column(String(50), default="claude")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    total_tokens_input: Mapped[int] = mapped_column(Integer, default=0)
+    total_tokens_output: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Relationships
+    survey: Mapped["Survey"] = relationship()
+    response: Mapped["Response"] = relationship()
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+    extracted_ratings: Mapped[list["ChatExtractedRating"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+    summary: Mapped[Optional["ChatSummary"]] = relationship(
+        back_populates="session", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class ChatMessage(Base):
+    """Individual message in a chat survey session."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    session_id: Mapped[str] = mapped_column(String(36), ForeignKey("chat_sessions.id"))
+    role: Mapped[ChatMessageRole] = mapped_column(Enum(ChatMessageRole), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    dimension_context: Mapped[Optional[FrictionType]] = mapped_column(
+        Enum(FrictionType), nullable=True
+    )
+    is_rating_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    tokens_input: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    tokens_output: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Relationships
+    session: Mapped["ChatSession"] = relationship(back_populates="messages")
+
+
+class ChatExtractedRating(Base):
+    """AI-extracted rating from chat conversation for a friction dimension."""
+
+    __tablename__ = "chat_extracted_ratings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    session_id: Mapped[str] = mapped_column(String(36), ForeignKey("chat_sessions.id"))
+    dimension: Mapped[FrictionType] = mapped_column(Enum(FrictionType), nullable=False)
+    ai_inferred_score: Mapped[float] = mapped_column(Float, nullable=False)  # 1-5 scale
+    ai_confidence: Mapped[float] = mapped_column(Float, default=0.8)  # 0-1
+    ai_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    user_adjusted_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    final_score: Mapped[float] = mapped_column(Float, nullable=False)  # Normalized 0-100
+    key_quotes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    summary_comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # AI-generated comment
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    session: Mapped["ChatSession"] = relationship(back_populates="extracted_ratings")
+
+    __table_args__ = (
+        UniqueConstraint('session_id', 'dimension', name='uq_session_dimension'),
+    )
+
+
+class ChatSummary(Base):
+    """AI-generated summary of a chat survey session."""
+
+    __tablename__ = "chat_summaries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_sessions.id"), unique=True
+    )
+    executive_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    key_pain_points: Mapped[list] = mapped_column(JSON, default=list)  # [{dimension, description, severity}]
+    positive_aspects: Mapped[list] = mapped_column(JSON, default=list)
+    improvement_suggestions: Mapped[list] = mapped_column(JSON, default=list)
+    overall_sentiment: Mapped[str] = mapped_column(String(50), default="neutral")  # positive/neutral/negative
+    dimension_sentiments: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    session: Mapped["ChatSession"] = relationship(back_populates="summary")

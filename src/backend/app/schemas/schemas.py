@@ -6,6 +6,8 @@ from typing import Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.models import (
+    ChatMessageRole,
+    ChatSessionStatus,
     CollaborationLevel,
     ComplexityLevel,
     FrictionType,
@@ -239,6 +241,7 @@ class AnswerCreate(BaseModel):
     question_id: str
     value: str
     numeric_value: Optional[float] = None
+    comment: Optional[str] = None
 
 
 class AnswerResponse(BaseSchema):
@@ -247,6 +250,7 @@ class AnswerResponse(BaseSchema):
     question_id: str
     value: str
     numeric_value: Optional[float]
+    comment: Optional[str] = None
 
 
 # Response schemas (survey submission)
@@ -604,3 +608,146 @@ class PsychSafetyCreateRequest(BaseModel):
 
     team_id: str
     name: Optional[str] = None  # Defaults to "Psychological Safety Assessment"
+
+
+# ============================================================================
+# Chat Survey Schemas
+# ============================================================================
+
+
+class ChatSessionCreate(BaseModel):
+    """Request to start a new chat survey session."""
+
+    survey_id: str
+    llm_provider: str = "claude"  # "claude" or "gpt"
+
+
+class ChatMessageCreate(BaseModel):
+    """Request to send a message in a chat session."""
+
+    content: str
+
+
+class RatingConfirmation(BaseModel):
+    """Request to confirm or adjust an AI-inferred rating."""
+
+    dimension: FrictionType
+    confirmed: bool
+    adjusted_score: Optional[float] = Field(default=None, ge=1.0, le=5.0)
+
+
+class ChatMessageResponse(BaseSchema):
+    """Response schema for a chat message."""
+
+    id: str
+    session_id: str
+    role: ChatMessageRole
+    content: str
+    dimension_context: Optional[FrictionType] = None
+    is_rating_confirmation: bool = False
+    sequence: int
+    created_at: datetime
+
+
+class ChatExtractedRatingResponse(BaseSchema):
+    """Response schema for an extracted rating."""
+
+    id: str
+    session_id: str
+    dimension: FrictionType
+    ai_inferred_score: float
+    ai_confidence: float
+    ai_reasoning: Optional[str] = None
+    user_confirmed: bool
+    user_adjusted_score: Optional[float] = None
+    final_score: float
+    key_quotes: Optional[list] = None
+    summary_comment: Optional[str] = None
+    created_at: datetime
+
+
+class ChatSummaryResponse(BaseSchema):
+    """Response schema for a chat summary."""
+
+    id: str
+    session_id: str
+    executive_summary: str
+    key_pain_points: list  # [{dimension, description, severity}]
+    positive_aspects: list
+    improvement_suggestions: list
+    overall_sentiment: str
+    dimension_sentiments: dict
+    created_at: datetime
+
+
+class ChatSessionResponse(BaseSchema):
+    """Response schema for a chat session."""
+
+    id: str
+    survey_id: str
+    response_id: str
+    anonymous_token: str
+    status: ChatSessionStatus
+    current_dimension: Optional[FrictionType] = None
+    dimensions_covered: dict
+    llm_provider: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    last_activity_at: datetime
+    total_tokens_input: int
+    total_tokens_output: int
+
+
+class ChatConversationResponse(BaseModel):
+    """Response containing session info and all messages."""
+
+    session: ChatSessionResponse
+    messages: list[ChatMessageResponse]
+    extracted_ratings: list[ChatExtractedRatingResponse] = []
+
+
+class ChatMessageSendResponse(BaseModel):
+    """Response after sending a message."""
+
+    user_message: ChatMessageResponse
+    assistant_message: ChatMessageResponse
+    session_status: ChatSessionStatus
+    current_dimension: Optional[FrictionType] = None
+    dimensions_covered: dict
+    pending_rating_confirmation: Optional[dict] = None  # {dimension, inferred_score, reasoning}
+
+
+class ChatRatingConfirmResponse(BaseModel):
+    """Response after confirming a rating."""
+
+    rating: ChatExtractedRatingResponse
+    next_dimension: Optional[FrictionType] = None
+    all_confirmed: bool
+    assistant_message: Optional[ChatMessageResponse] = None
+
+
+class ChatCompleteResponse(BaseModel):
+    """Response when completing a chat session."""
+
+    session: ChatSessionResponse
+    summary: ChatSummaryResponse
+    extracted_ratings: list[ChatExtractedRatingResponse]
+    metrics_calculated: bool
+    metric_result_id: Optional[str] = None
+
+
+class ChatTranscriptResponse(BaseModel):
+    """Full transcript of a chat session."""
+
+    session: ChatSessionResponse
+    messages: list[ChatMessageResponse]
+    extracted_ratings: list[ChatExtractedRatingResponse]
+    summary: Optional[ChatSummaryResponse] = None
+
+
+class StartChatSurveyResponse(BaseModel):
+    """Response when starting a new chat survey."""
+
+    session: ChatSessionResponse
+    opening_message: ChatMessageResponse
+    chat_url: str
