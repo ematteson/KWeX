@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'styled-components'
 import App from './App'
 import { workforceTheme, GlobalStyles } from './design-system'
+import './index.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
